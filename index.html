@@ -1542,7 +1542,7 @@ function userDlg(id) {
 function saveUser(id) {
   const name = $v('f_name').trim(), email = $v('f_email').trim(); if (!name || !email) { toast('Nombre y correo son obligatorios', 'err'); return; }
   if (DB.users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.id !== id)) { toast('Ya existe un usuario con ese correo', 'err'); return; }
-  if (typeof ALLOWED_DOMAIN !== 'undefined' && !email.toLowerCase().endsWith('@' + ALLOWED_DOMAIN)) { toast('El correo debe ser @' + ALLOWED_DOMAIN, 'err'); return; }
+  if (typeof emailAllowed === 'function' && !emailAllowed(email)) { toast('El correo debe ser @' + ALLOWED_DOMAIN + ' o de un dominio autorizado (' + ALLOWED_DOMAINS.join(', ') + ')', 'err'); return; }
   const data = { name, email, roleId: $v('f_role'), positionId: $v('f_pos'), areaId: $v('f_area') };
   let newId = null;
   if (id) { const u = byId('users', id); for (const k in data) if (u[k] !== data[k]) { audit('users', id, 'editar', k, k === 'password' ? '••••' : u[k], k === 'password' ? '••••' : data[k]); u[k] = data[k]; } }
@@ -1917,7 +1917,7 @@ async function sbAfterAuth(session) {
 }
 async function sbLogin(email, password) {
   const btn = document.getElementById('loginBtn');
-  if (!email.trim().toLowerCase().endsWith('@' + ALLOWED_DOMAIN)) { toast('Usa tu correo @' + ALLOWED_DOMAIN, 'err'); return; }
+  if (!emailAllowed(email)) { toast('Usa tu correo corporativo (@' + ALLOWED_DOMAIN + ' o un dominio autorizado)', 'err'); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Entrando…'; }
   const { data, error } = await SB.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
   if (error) { toast(error.message === 'Invalid login credentials' ? 'Correo o contraseña incorrectos' : error.message, 'err'); if (btn) { btn.disabled = false; btn.textContent = 'Entrar'; } return; }
@@ -1940,6 +1940,9 @@ async function sbSetPassword(p1, p2) {
 function login() { }
 const INITIAL_PASSWORD = 'Comer26';
 const ALLOWED_DOMAIN = 'alvaco.com.mx';
+// Dominios externos autorizados (direcciones invitadas). Para agregar otro, añádelo aquí y en fn_provision_access (SQL).
+const ALLOWED_DOMAINS = ['alvaco.com.mx', 'mafemasa.com.mx', 'comoio.mx'];
+const emailAllowed = (email) => ALLOWED_DOMAINS.some(d => String(email || '').trim().toLowerCase().endsWith('@' + d));
 /* Activa (o restablece) el acceso de un usuario: crea su cuenta en Supabase Auth con la contraseña inicial */
 async function sbProvision(userId, reset = false) {
   try {
@@ -1989,7 +1992,7 @@ function renderLogin() {
   return `<div class="login"><div class="login-box">
     <div class="login-left"><img src="${IMG.checklist}" alt=""><div class="brand-title">Control Semanal<br>de KPIs</div><div style="opacity:.85;font-size:14px;margin-top:6px">ALVACO · Comercialización</div></div>
     <div class="login-right"><h2 class="brand-title" style="font-size:26px">Iniciar sesión</h2>
-      <p class="muted small">Entra con tu correo <b>@alvaco.com.mx</b> y la contraseña inicial <b>Comer26</b> (puedes cambiarla después desde el menú).</p>
+      <p class="muted small">Entra con tu correo corporativo (<b>@alvaco.com.mx</b>) y la contraseña inicial <b>Comer26</b> (puedes cambiarla después desde el menú).</p>
       <form onsubmit="sbLogin(document.getElementById('lg_email').value, document.getElementById('lg_pass').value); return false;">
         <div class="field"><label>Correo</label><input id="lg_email" type="email" autocomplete="username" placeholder="nombre@alvaco.com.mx" required></div>
         <div class="field"><label>Contraseña</label><input id="lg_pass" type="password" autocomplete="current-password" required></div>
