@@ -388,7 +388,10 @@ const where = (col, fn) => DB[col].filter(fn);
 const roleOf = (u) => byId('roles', u.roleId);
 const isAdmin = (u) => roleOf(u).code === 'ADMIN';
 const isDir = (u) => roleOf(u).code === 'DIRECTIVO';
-const isExec = (u) => roleOf(u).code === 'EJECUTIVO';
+// Se considera "ejecutivo" (aparece en dashboards, metas, semanas y captura) a quien tiene rol EJECUTIVO
+// o a cualquier persona con KPIs/cadenas asignadas aunque su rol sea Administrador o Directivo.
+const hasOwnKpis = (u) => DB.user_kpi_targets.some(t => t.userId === u.id) || DB.user_chain_assignments.some(a => a.userId === u.id && !a.endDate);
+const isExec = (u) => roleOf(u).code === 'EJECUTIVO' || hasOwnKpis(u);
 function nameOf(col, id, fb = '—') { const x = byId(col, id); return x ? x.name : fb; }
 const execs = () => where('users', u => isExec(u) && u.active).sort((a, b) => a.name.localeCompare(b.name));
 
@@ -978,10 +981,13 @@ function render() {
   destroyCharts(); closeModal();
   const app = document.getElementById('app'); const u = currentUser();
   if (!u || !u.active) { app.innerHTML = renderLogin(); return; }
-  const role = roleOf(u).code; const menu = MENUS[role];
-  if (!ROUTE.view || !menu.find(m => m[0] === ROUTE.view)) ROUTE = { view: menu[0][0], params: {} };
+  const role = roleOf(u).code; let menu = MENUS[role];
+  // Administradores/directivos con KPIs propios también ven su captura personal.
+  const ownKpis = role !== 'EJECUTIVO' && hasOwnKpis(u);
+  if (ownKpis) menu = menu.concat([['sep', 'Mis KPIs'], ['avance', 'Mi avance', 'chart'], ['captura', 'Mi captura semanal', 'edit'], ['historial', 'Mi historial', 'hist']]);
+  if (!ROUTE.view || !menu.find(m => m[0] === ROUTE.view && m[0] !== 'sep')) ROUTE = { view: menu[0][0], params: {} };
   const q = activeQuarter(); const cw = q ? currentWeek(q.id) : null;
-  const navHTML = menu.map(m => `<a href="#${m[0]}" class="${ROUTE.view === m[0] ? 'active' : ''}" onclick="nav('${m[0]}');return false;">${ICONS[m[2]]}${m[1]}</a>`).join('');
+  const navHTML = menu.map(m => m[0] === 'sep' ? `<div class="sec">${m[1]}</div>` : `<a href="#${m[0]}" class="${ROUTE.view === m[0] ? 'active' : ''}" onclick="nav('${m[0]}');return false;">${ICONS[m[2]]}${m[1]}</a>`).join('');
   app.innerHTML = `<div class="shell">
     <aside class="sidebar">
       <div class="logo"><img src="${IMG.peek}" alt=""><div><div class="brand-title">KPIs Comer</div><div class="sub">${esc(DB.settings.company)}</div></div></div>
@@ -992,7 +998,7 @@ function render() {
     <div class="footerbar"><b>${esc(DB.settings.company)}</b><span>${esc(DB.settings.appName)} · <span id="sbStatus"></span> ${q ? esc(q.name) : ''}${cw ? ' · Semana ' + cw.number : ''}${DB.settings.simDate ? ' · Fecha de referencia: ' + fmtDate(DB.settings.simDate) : ''}</span></div>
   </div>`;
   const main = document.getElementById('main');
-  const fn = VIEWS[role + ':' + ROUTE.view];
+  const fn = VIEWS[role + ':' + ROUTE.view] || (ownKpis ? VIEWS['EJECUTIVO:' + ROUTE.view] : null);
   main.innerHTML = fn ? fn(u, q, cw, ROUTE.params) : '<p>Vista no disponible.</p>';
   if (window.__afterRender) { const f = window.__afterRender; window.__afterRender = null; f(); }
 }
