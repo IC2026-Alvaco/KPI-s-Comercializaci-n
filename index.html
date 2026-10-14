@@ -347,8 +347,15 @@ table.tbl .mini-bar i{display:block;height:100%;background:var(--azul);border-ra
 .note{font-size:12px;color:var(--txt2);margin-top:6px}
 @media print{.sidebar,.footerbar,.btn{display:none!important}.shell{grid-template-columns:1fr}}
 /* iconos inline fuera de botones/menú (p. ej. títulos de grupo en Metas) */
-b > svg, h3 > svg, .row > b svg, .eyebrow svg, .modal-h svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px;margin-right:4px}
+b > svg, h3 > svg, .row > b svg, .eyebrow svg, .modal-h svg, span.small > svg, .row > span > svg, .note svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px;margin-right:4px}
 
+/* confirmación Sí / No */
+.modal-bg.confirm2{z-index:60;background:rgba(31,56,100,.55)}
+.confirm-box{width:min(460px,100%);border-radius:22px}
+.confirm-icon{width:64px;height:64px;border-radius:50%;background:var(--amar-bg);border:1px solid var(--amar-b);color:var(--amar);display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+.confirm-icon svg{width:30px;height:30px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn.yes{background:var(--verde);border-color:var(--verde);color:#fff;min-width:120px;justify-content:center;box-shadow:0 6px 16px rgba(30,126,52,.25)}
+.btn.no{background:var(--rojo);border-color:var(--rojo);color:#fff;min-width:120px;justify-content:center;box-shadow:0 6px 16px rgba(192,57,43,.25)}
 /* detalle por local (KPI Locales) */
 .loc-row{border:1px solid var(--card-b);border-left:5px solid var(--azul);border-radius:10px;padding:10px 14px;margin-bottom:8px;background:#fff}
 .loc-row.fast{border-left-color:var(--verde)}.loc-row.slow{border-left-color:var(--rojo)}
@@ -477,6 +484,10 @@ const isConjuntoKpi = (k) => !!k && k.captureMode === 'conjunto';
 function rentasGlobalTrimestre(qid) { const f = Number(DB.settings.rentasMesFijas) || 0, v = Number(DB.settings.rentasMesVariables) || 0; const m = qid ? monthsOfQuarter(qid).length || 3 : 3; return { fijas: f, variables: v, mes: f + v, meses: m, trimestre: (f + v) * m }; }
 function parseFV(detail) { const m = /Fijas:\s*([\d.]+).*Variables:\s*([\d.]+)/i.exec(detail || ''); return m ? { fijas: Number(m[1]), variables: Number(m[2]) } : { fijas: '', variables: '' }; }
 /* Equipos parados: pendientes de la semana anterior + nuevos = tenían; se capturan los resueltos y el resto pasa a la siguiente semana */
+/* KPI corporativo (Meta anual corporativa): un solo valor para toda la compañía; solo lo actualiza el responsable definido en Parámetros */
+const isCorporativoKpi = (k) => !!k && k.captureMode === 'corporativo';
+function corporativoEditors() { return String(DB.settings.kpiCorporativoEditor || '').toLowerCase().split(/[,;\s]+/).filter(Boolean); }
+const canEditCorporativo = (u) => !!u && corporativoEditors().includes(String(u.email || '').toLowerCase());
 const isParadosKpi = (k) => !!k && k.captureMode === 'parados';
 function paradosPendientesPrevios(userId, kpiId, qid, weekNumber) { const r = computeKpi(userId, kpiId, qid, weekNumber - 1, { includeDraft: true }); const last = [...r.series].reverse().find(x => x.raw && x.raw.denominator != null); return last ? Math.max(0, (Number(last.raw.denominator) || 0) - (Number(last.raw.numerator) || 0)) : 0; }
 const isConteoKpi = (k) => !!k && k.type === 'C' && k.numeratorMode === 'acumulado' && k.denominatorMode === 'acumulado';
@@ -571,9 +582,11 @@ function computeKpi(userId, kpiId, qid, uptoWeekNumber = null, opts = {}) {
   return r;
 }
 /* KPI anual: captura libre; el valor vigente es la última actualización hasta la fecha de referencia */
-function annualEntries(userId, kpiId, year) { return where('annual_kpi_entries', e => e.userId === userId && e.kpiId === kpiId && e.year === year).sort((a, b) => a.ts.localeCompare(b.ts)); }
+function annualEntries(userId, kpiId, year) { const corp = isCorporativoKpi(byId('kpis', kpiId)); return where('annual_kpi_entries', e => (corp || e.userId === userId) && e.kpiId === kpiId && e.year === year).sort((a, b) => a.ts.localeCompare(b.ts)); }
 function computeAnnualKpi(userId, kpiId, year, opts = {}) {
-  const kpi = byId('kpis', kpiId); const t = annualTarget(userId, kpiId, year);
+  const kpi = byId('kpis', kpiId); let t = annualTarget(userId, kpiId, year);
+  // corporativo: la meta es la misma para todos; si quien consulta no tiene meta propia (p. ej. la Directora), se toma la de cualquier ejecutivo
+  if (!t && isCorporativoKpi(kpi)) { const any = DB.user_kpi_targets.find(x => x.kpiId === kpiId && x.periodType === 'anual' && x.year === year && x.active !== false); if (any) t = { ...any, userId, weight: 0 }; }
   const cutoff = opts.cutoff || (refDate() + 'T23:59:59');
   const entries = annualEntries(userId, kpiId, year).filter(e => e.ts.slice(0, 19) <= cutoff);
   const last = entries[entries.length - 1] || null;
@@ -648,6 +661,21 @@ function groupSum(rows, keyFn, labelFn) {
 }
 
 /* ---------- captura de KPI anual (bitácora: cada modificación queda con fecha, hora y usuario) ---------- */
+/* Borra la captura completa de una semana (si sigue editable). Las semanas cerradas o bloqueadas solo las reabre un administrador. */
+function deleteSubmission(userId, weekId) {
+  const me = currentUser(); const w = byId('reporting_weeks', weekId); const s = submissionOf(userId, weekId);
+  if (!s) throw new Error('No hay captura que eliminar');
+  if (!isAdmin(me) && me.id !== userId) throw new Error('Solo puedes eliminar tu propia captura');
+  if (!canEditWeek(me, w) || (s.status === 'cerrado' && !isAdmin(me))) throw new Error('La semana está cerrada; solicita al administrador que la reabra');
+  const vals = valuesOf(s.id); const vids = new Set(vals.map(v => v.id));
+  DB.kpi_local_items = DB.kpi_local_items.filter(it => !vids.has(it.weeklyKpiValueId));
+  DB.kpi_chain_breakdowns = DB.kpi_chain_breakdowns.filter(b => !vids.has(b.weeklyKpiValueId));
+  DB.comments = (DB.comments || []).filter(c => c.submissionId !== s.id);
+  DB.weekly_kpi_values = DB.weekly_kpi_values.filter(v => v.submissionId !== s.id);
+  DB.weekly_submissions = DB.weekly_submissions.filter(x => x.id !== s.id);
+  audit('weekly_submissions', s.id, 'eliminar', `Semana ${w.number} · ${nameOf('users', userId)}`, s.status, null);
+  saveDB();
+}
 function saveAnnualEntry(userId, kpiId, year, data) {
   const kpi = byId('kpis', kpiId); const prev = computeAnnualKpi(userId, kpiId, year, { cutoff: '9999' }).last;
   const e = { id: uid('ae'), userId, kpiId, year, value: data.value ?? null, numerator: data.numerator ?? null, denominator: data.denominator ?? null, comment: data.comment || '', detail: data.detail ?? null, ts: nowISO(), createdBy: SESSION.userId };
@@ -1010,6 +1038,17 @@ function confirmDlg(title, text, onOk, okLabel = 'Confirmar', danger = false) {
   document.getElementById('confirmOk').onclick = () => { closeModal(); onOk(); };
 }
 
+/* Confirmación sobre el modal actual (no lo cierra): Sí en verde, No en rojo */
+function confirmYesNo(title, text, onYes, yesLabel = 'Sí', noLabel = 'No') {
+  const old = document.getElementById('confirm2'); if (old) old.remove();
+  const bg = document.createElement('div'); bg.className = 'modal-bg confirm2'; bg.id = 'confirm2';
+  bg.innerHTML = `<div class="modal confirm-box"><div class="modal-b"><div class="confirm-icon">${ICONS.alert}</div><h2 class="brand-title" style="font-size:22px;text-align:center">${title}</h2><p class="center" style="margin:10px 0 0">${text}</p></div><div class="modal-f" style="justify-content:center;gap:14px"><button class="btn no" id="confirmNo">${ICONS.x || ''}${noLabel}</button><button class="btn yes" id="confirmYes">${ICONS.check}${yesLabel}</button></div></div>`;
+  document.body.appendChild(bg);
+  document.getElementById('confirmNo').onclick = () => bg.remove();
+  document.getElementById('confirmYes').onclick = () => { bg.remove(); onYes(); };
+  bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
+}
+
 /* ---------- gráficas (Chart.js) ---------- */
 const CHARTS = {};
 function destroyCharts() { for (const k in CHARTS) { try { CHARTS[k].destroy(); } catch (e) { } delete CHARTS[k]; } }
@@ -1195,12 +1234,14 @@ function annualCardHTML(k, opts = {}) {
     </div>
     ${progressBar(k.pct, k.sem)}
     <div class="row between small muted"><span>Peso ${fmtNum(k.weight)}% · ${k.kpi.type === 'A' ? 'Cantidad' : 'Porcentaje'}${k.kpi.direction === 'menor' ? ' · menor es mejor' : ''}</span><span>${last ? `Última actualización: ${fmtDateTime(last.ts)} · ${esc(nameOf('users', last.createdBy, ''))}` : 'Sin actualizaciones'}</span></div>
-    ${opts.readOnly ? `<button class="btn ghost sm" onclick="openAnnualCapture('${k.target.userId}','${k.kpi.id}',${k.year},true)">${ICONS.hist}Ver bitácora (${k.entries.length})</button>` : `<div class="row"><button class="btn mor sm" onclick="openAnnualCapture('${k.target.userId}','${k.kpi.id}',${k.year})">${ICONS.edit}Actualizar avance</button><span class="small muted">${k.entries.length} actualización(es) registradas</span></div>`}
+    ${isCorporativoKpi(k.kpi) && !canEditCorporativo(currentUser()) ? `<div class="row"><button class="btn ghost sm" onclick="openAnnualCapture('${k.target.userId}','${k.kpi.id}',${k.year},true)">${ICONS.hist}Ver bitácora (${k.entries.length})</button><span class="small muted">${ICONS.shield} Dato corporativo: lo actualiza ${esc(corporativoEditors().join(', ') || 'Dirección')}</span></div>` : opts.readOnly ? `<button class="btn ghost sm" onclick="openAnnualCapture('${k.target.userId}','${k.kpi.id}',${k.year},true)">${ICONS.hist}Ver bitácora (${k.entries.length})</button>` : `<div class="row"><button class="btn mor sm" onclick="openAnnualCapture('${k.target.userId}','${k.kpi.id}',${k.year})">${ICONS.edit}Actualizar avance</button><span class="small muted">${k.entries.length} actualización(es) registradas</span></div>`}
   </div>`;
 }
 let ANN = null;
 function openAnnualCapture(userId, kpiId, year, readOnly = false) {
-  const me = currentUser(); if (!isAdmin(me) && me.id !== userId && !isDir(me)) return; if (isDir(me)) readOnly = true;
+  const me = currentUser(); const corp = isCorporativoKpi(byId('kpis', kpiId));
+  if (corp) { if (canEditCorporativo(me)) { userId = me.id; readOnly = readOnly && false; } else readOnly = true; }
+  else { if (!isAdmin(me) && me.id !== userId && !isDir(me)) return; if (isDir(me)) readOnly = true; }
   const k = computeAnnualKpi(userId, kpiId, year, { cutoff: '9999' }); const kpi = k.kpi; const last = k.last; const u = byId('users', userId);
   ANN = { userId, kpiId, year };
   const hist = [...k.entries].reverse().map((e, i, arr) => { const prev = arr[i + 1]; const val = kpi.type === 'A' ? fmtNum(e.value) : `${fmtPct(e.value, 1)} (${fmtNum(e.numerator)}/${fmtNum(e.denominator)})`; const pv = prev ? (kpi.type === 'A' ? fmtNum(prev.value) : fmtPct(prev.value, 1)) : '—'; return `<tr><td class="small" style="white-space:nowrap">${fmtDateTime(e.ts)}</td><td>${esc(nameOf('users', e.createdBy, 'sistema'))}</td><td class="num muted small">${pv}</td><td class="num"><b>${val}</b></td><td class="small">${e.detail ? `<div>${listaLines(e.detail).map(esc).join(', ')}</div>` : ''}${esc(e.comment || '')}</td></tr>`; }).join('') || '<tr><td colspan="5" class="center muted">Sin actualizaciones registradas</td></tr>';
@@ -1218,7 +1259,8 @@ function openAnnualCapture(userId, kpiId, year, readOnly = false) {
 }
 function anListCount() { const el = document.getElementById('an_list'); const out = document.getElementById('an_value'); if (el && out) out.value = listaLines(el.value).length; }
 function submitAnnual() {
-  const kpi = byId('kpis', ANN.kpiId); const g = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+  const kpi = byId('kpis', ANN.kpiId);
+  if (isCorporativoKpi(kpi) && !canEditCorporativo(currentUser())) { toast('Solo ' + (corporativoEditors().join(', ') || 'Dirección') + ' puede actualizar este KPI corporativo', 'err'); return; } const g = id => { const el = document.getElementById(id); return el ? el.value : ''; };
   const data = { comment: g('an_comment') };
   if (isListaKpi(kpi)) { const lines = listaLines(g('an_list')); data.value = lines.length; data.detail = lines.join('\n'); }
   else if (kpi.type === 'A') { if (g('an_value') === '' || Number(g('an_value')) < 0) { toast('Captura un avance válido (≥ 0)', 'err'); return; } data.value = Number(g('an_value')); }
@@ -1363,7 +1405,8 @@ function renderCaptureModal() {
     <div id="capKpis">${ts.map((t, i) => captureKpiHTML(t, i, chains, val)).join('')}</div>
     <div class="field mt8"><label>Comentarios de la semana</label><textarea rows="2" ${readOnly ? 'disabled' : ''} oninput="CAP.payload.__comment=this.value" placeholder="Contexto, bloqueos, logros relevantes…">${esc(payload.__comment)}</textarea></div>
     <div id="capSummary">${captureSummaryHTML(val, ts)}</div>`;
-  const foot = readOnly ? `<button class="btn ghost" onclick="closeModal()">Cerrar</button>` : `<button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn sec" onclick="submitCapture('borrador')">${ICONS.save}Guardar borrador</button><button class="btn ok" id="btnEnviar" ${val.ok ? '' : 'disabled'} onclick="submitCapture('enviar')">${ICONS.send}${st.code === 'enviado' ? 'Reenviar semana' : 'Enviar semana'}</button>`;
+  const me = currentUser(); const canDelete = !readOnly && s && canEditWeek(me, w);
+  const foot = readOnly ? `<button class="btn ghost" onclick="closeModal()">Cerrar</button>` : `<button class="btn ghost" onclick="closeModal()">Cancelar</button>${canDelete ? `<button class="btn danger" onclick="deleteCaptureDlg()" title="Borra todo lo capturado de esta semana para volver a empezar">${ICONS.trash}Eliminar mi captura</button>` : ''}<button class="btn sec" onclick="submitCapture('borrador')">${ICONS.save}Guardar borrador</button><button class="btn ok" id="btnEnviar" ${val.ok ? '' : 'disabled'} onclick="submitCapture('enviar')">${ICONS.send}${st.code === 'enviado' ? 'Reenviar semana' : 'Enviar semana'}</button>`;
   openModal(`Semana ${w.number} · Captura`, body, foot, { sticky: !readOnly });
 }
 function captureKpiHTML(t, i, chains, val) {
@@ -1481,11 +1524,19 @@ function capBdRemove(kpiId, j) { CAP.payload[kpiId].breakdown.splice(j, 1); capR
 /* KPI Locales: el número de locales genera un renglón por cada uno */
 function capLocN(kpiId, v) { v = numClean(v); const p = CAP.payload[kpiId]; p.value = v; const n = Math.max(0, Math.min(200, Math.floor(Number(v) || 0))); p.items = p.items || []; while (p.items.length < n) p.items.push({ kind: '', referenceDate: '', installDays: '', note: '' }); if (p.items.length > n) p.items.length = n; capRefresh(); }
 function capLoc(kpiId, j, field, v) { CAP.payload[kpiId].items[j][field] = field === 'installDays' ? numClean(v) : v; capRefresh(); }
-function submitCapture(mode) {
+function submitCapture(mode, confirmed = false) {
   const val = validateCapture(CAP.u, CAP.w, CAP.payload, mode);
   if (!val.ok) { toast(val.errors[0], 'err'); capRefresh(); return; }
+  if (mode === 'enviar' && !confirmed) { confirmYesNo('¿Estás seguro?', `¿Deseas enviar la información de la <b>semana ${CAP.w.number}</b>? Dirección e Inteligencia Comercial la verán de inmediato. Podrás corregirla o eliminarla mientras la semana siga abierta.`, () => submitCapture('enviar', true)); return; }
   try { saveCapture(CAP.u, CAP.w, CAP.payload, mode); } catch (e) { toast(e.message, 'err'); return; }
   closeModal(); render(); toast(mode === 'enviar' ? `Semana ${CAP.w.number} enviada correctamente` : 'Borrador guardado', 'ok');
+}
+/* Eliminar lo capturado de la semana (solo mientras la semana siga abierta; una semana cerrada solo la reabre un administrador) */
+function deleteCaptureDlg() {
+  confirmYesNo('¿Eliminar tu captura?', `Se borrará <b>todo</b> lo capturado de la <b>semana ${CAP.w.number}</b> (valores, desglose por cadena y detalle de locales). La semana volverá a quedar pendiente y podrás capturarla de nuevo.`, () => {
+    try { deleteSubmission(CAP.u.id, CAP.w.id); } catch (e) { toast(e.message, 'err'); return; }
+    closeModal(); render(); toast(`Captura de la semana ${CAP.w.number} eliminada`, 'ok');
+  }, 'Sí, eliminar', 'No');
 }
 function requestChainDlg() {
   const u = CAP.u;
@@ -1584,13 +1635,22 @@ function semMatrixHTML(d) {
   </tbody></table></div>`;
 }
 
+/* Tarjeta de los KPIs corporativos: visible para todos; con botón de actualizar solo para el responsable */
+function corporativoCardHTML(u) {
+  const year = new Date(refDate()).getFullYear(); const kpis = DB.kpis.filter(k => isCorporativoKpi(k) && k.active !== false); if (!kpis.length) return '';
+  const editor = canEditCorporativo(u);
+  return `<div class="grid g2 mb16">${kpis.map(kpi => { const k = computeAnnualKpi(u.id, kpi.id, year, { cutoff: '9999' }); const last = k.last; return `<div class="card kpi-card acc-m"><div class="head"><div><div class="name">${esc(kpi.name)} <span class="badge b-mor">Corporativo ${year}</span></div><div class="desc">${esc(kpi.centralActivity || '')}</div></div>${semBadge(k.sem)}</div>
+    <div class="kpi-stats" style="grid-template-columns:repeat(3,1fr)"><div class="stat"><span class="l">Meta anual</span><span class="v">${kpiTargetText(k)}</span></div><div class="stat"><span class="l">Avance actual</span><span class="v">${kpiValueText(k)}</span></div><div class="stat"><span class="l">Cumplimiento</span><span class="v" style="color:${SEM_COLORS[k.sem.code]}">${fmtPct(k.pct)}</span></div></div>${progressBar(k.pct, k.sem)}
+    <div class="row between small muted"><span>${last ? `Última actualización: ${fmtDateTime(last.ts)} · ${esc(nameOf('users', last.createdBy, ''))}` : 'Sin actualizaciones'}</span><span>${editor ? 'Eres la persona responsable de actualizarlo' : 'Lo actualiza ' + esc(corporativoEditors().join(', ') || 'Dirección')}</span></div>
+    <div class="row">${editor ? `<button class="btn mor sm" onclick="openAnnualCapture('${u.id}','${kpi.id}',${year})">${ICONS.edit}Actualizar avance</button>` : ''}<button class="btn ghost sm" onclick="openAnnualCapture('${u.id}','${kpi.id}',${year},true)">${ICONS.hist}Ver bitácora (${k.entries.length})</button></div></div>`; }).join('')}</div>`;
+}
 function biDashboardHTML(u, q, cw, isAdminView) {
   biInit(q, cw); const d = biData(); const qq = byId('quarters', BI.qid);
   const pendientes = d.users.filter(u => !d.reportedNow.includes(u));
   const byChain = topChains(groupSum(d.rows, r => r.chain.id, r => r.chain.name));
   const byUser = groupSum(d.rows, r => r.user.id, r => r.user.name);
   const html = topbar(isAdminView ? 'Dashboard' : 'Dashboard Directivo', `${esc(scopeLabel(d.scope))}. Cambia la vista entre mensual, trimestral y anual; haz clic en un ejecutivo, KPI o cadena para hacer drill-down.`, biChips()) +
-    biFiltersHTML(qq) + biKpiTiles(d) +
+    corporativoCardHTML(u) + biFiltersHTML(qq) + biKpiTiles(d) +
     (pendientes.length ? `<div class="msg warn mt16">${ICONS.bell}<b>${pendientes.length} de ${d.users.length} ejecutivos pendientes de reportar la semana ${d.lastWeek ? d.lastWeek.number + ' (' + fmtRange(d.lastWeek.startDate, d.lastWeek.endDate) + ')' : ''}:</b> ${pendientes.map(p => esc(p.name)).join(', ')}.</div>` : `<div class="msg ok mt16">${ICONS.check}Todos los ejecutivos filtrados ya reportaron la semana ${d.lastWeek ? d.lastWeek.number : ''}.</div>`) +
     `<div class="grid g2 mt16">
       ${chartBox('b_evo', 'Evolución semanal general', 'Acumulado de KPIs acumulativos (tipo A) vs trayectoria esperada', false, legendHTML([{ color: '#3F60A8', label: 'Acumulado real' }, { color: '#7B61C4', label: 'Trayectoria esperada' }, { color: '#0F9ED5', label: 'Reportado en la semana' }]))}
@@ -1771,7 +1831,7 @@ function kpiDlg(id) {
     ${formField('Periodicidad', `<select id="k_per"><option value="trimestral" ${k.periodicity !== 'anual' ? 'selected' : ''}>Trimestral · captura semanal</option><option value="anual" ${k.periodicity === 'anual' ? 'selected' : ''}>Anual · captura libre con bitácora</option></select>`)}${formField('Tipo de cálculo', `<select id="k_type" onchange="kpiTypeUI()"><option value="A" ${k.type === 'A' ? 'selected' : ''}>A · Cantidad acumulativa</option><option value="B" ${k.type === 'B' ? 'selected' : ''}>B · Porcentaje / snapshot</option><option value="C" ${k.type === 'C' ? 'selected' : ''}>C · Ratio contra objetivo</option></select>`)}${formField('Unidad', `<input id="k_unit" value="${esc(k.unit)}">`)}
     ${formField('Actividad central', `<input id="k_act" value="${esc(k.centralActivity || '')}">`)}${formField('Dirección', `<select id="k_dir"><option value="mayor" ${k.direction !== 'menor' ? 'selected' : ''}>Mayor es mejor</option><option value="menor" ${k.direction === 'menor' ? 'selected' : ''}>Menor es mejor (invierte el cumplimiento)</option></select>`)}</div>
     ${formField('Descripción de la fórmula', `<textarea id="k_form" rows="2">${esc(k.formulaDescription || '')}</textarea>`)}
-    <div id="k_ratio" class="fields ${k.type === 'A' ? 'hidden' : ''}">${formField('Etiqueta del numerador', `<input id="k_numl" value="${esc(k.numeratorLabel || '')}">`)}${formField('Etiqueta del denominador', `<input id="k_denl" value="${esc(k.denominatorLabel || '')}">`)}${formField('Modo de captura', `<select id="k_capm"><option value="normal" ${!['locales','lista','conjunto','parados'].includes(k.captureMode) ? 'selected' : ''}>Normal (cantidad o numerador y denominador)</option><option value="lista" ${k.captureMode === 'lista' ? 'selected' : ''}>Lista de nombres: se escriben uno por renglón y cada uno cuenta 1 (semanal o anual)</option><option value="conjunto" ${k.captureMode === 'conjunto' ? 'selected' : ''}>Rentas pagadas (conjunto): fijas + variables de cada quien vs. el global del trimestre de Parámetros</option><option value="parados" ${k.captureMode === 'parados' ? 'selected' : ''}>Equipos parados: pendientes anteriores + nuevos = tenían; resueltos; el resto pasa a la siguiente semana</option><option value="locales" ${k.captureMode === 'locales' ? 'selected' : ''}>Locales: un renglón por local (nuevo / reacondicionado, fecha, días)</option></select>`)}${formField('Numerador', `<select id="k_numm"><option value="acumulado" ${k.numeratorMode !== 'snapshot' ? 'selected' : ''}>Acumulado en el trimestre</option><option value="snapshot" ${k.numeratorMode === 'snapshot' ? 'selected' : ''}>Snapshot de la semana</option></select>`)}${formField('Denominador', `<select id="k_denm"><option value="snapshot" ${k.denominatorMode !== 'acumulado' ? 'selected' : ''}>Snapshot de la semana</option><option value="acumulado" ${k.denominatorMode === 'acumulado' ? 'selected' : ''}>Acumulado en el trimestre</option></select>`)}</div>
+    <div id="k_ratio" class="fields ${k.type === 'A' ? 'hidden' : ''}">${formField('Etiqueta del numerador', `<input id="k_numl" value="${esc(k.numeratorLabel || '')}">`)}${formField('Etiqueta del denominador', `<input id="k_denl" value="${esc(k.denominatorLabel || '')}">`)}${formField('Modo de captura', `<select id="k_capm"><option value="normal" ${!['locales','lista','conjunto','parados','corporativo'].includes(k.captureMode) ? 'selected' : ''}>Normal (cantidad o numerador y denominador)</option><option value="lista" ${k.captureMode === 'lista' ? 'selected' : ''}>Lista de nombres: se escriben uno por renglón y cada uno cuenta 1 (semanal o anual)</option><option value="conjunto" ${k.captureMode === 'conjunto' ? 'selected' : ''}>Rentas pagadas (conjunto): fijas + variables de cada quien vs. el global del trimestre de Parámetros</option><option value="corporativo" ${k.captureMode === 'corporativo' ? 'selected' : ''}>Corporativo: un solo valor para toda la compañía; solo lo actualiza el responsable de Parámetros</option><option value="parados" ${k.captureMode === 'parados' ? 'selected' : ''}>Equipos parados: pendientes anteriores + nuevos = tenían; resueltos; el resto pasa a la siguiente semana</option><option value="locales" ${k.captureMode === 'locales' ? 'selected' : ''}>Locales: un renglón por local (nuevo / reacondicionado, fecha, días)</option></select>`)}${formField('Numerador', `<select id="k_numm"><option value="acumulado" ${k.numeratorMode !== 'snapshot' ? 'selected' : ''}>Acumulado en el trimestre</option><option value="snapshot" ${k.numeratorMode === 'snapshot' ? 'selected' : ''}>Snapshot de la semana</option></select>`)}${formField('Denominador', `<select id="k_denm"><option value="snapshot" ${k.denominatorMode !== 'acumulado' ? 'selected' : ''}>Snapshot de la semana</option><option value="acumulado" ${k.denominatorMode === 'acumulado' ? 'selected' : ''}>Acumulado en el trimestre</option></select>`)}</div>
     <div id="k_bdwrap" class="${k.type !== 'A' ? 'hidden' : ''}"><label class="switch"><input type="checkbox" id="k_bd" ${k.requiresChainBreakdown ? 'checked' : ''}> Requiere desglose por cadena (la suma del detalle debe igualar el total reportado)</label></div>`,
     `<button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" onclick="saveKpi('${id || ''}')">${ICONS.save}Guardar</button>`);
 }
@@ -1947,6 +2007,7 @@ VIEWS['ADMIN:parametros'] = (u, q) => {
       <div class="card acc-c"><h3>Textos</h3>${formField('Nombre de la aplicación', `<input id="p_app" value="${esc(s.appName)}">`)}${formField('Empresa / área (pie de página)', `<input id="p_company" value="${esc(s.company)}">`)}${formField('Texto del recordatorio', `<input id="p_rem" value="${esc(s.reminderText)}">`)}</div>
       <div class="card acc-g"><h3>Tarjetas del dashboard directivo</h3><p class="small muted">Las tarjetas fijas son Avance comercial general, Instalaciones y Clientes nuevos. Elige los 3 KPIs (trimestrales o anuales) de las tarjetas configurables.</p>${[0, 1, 2].map(i => formField('Tarjeta ' + (i + 4), `<select id="p_tile${i}">${DB.kpis.filter(k => k.active).map(k => `<option value="${k.id}" ${(s.dashboardTiles || [])[i] === k.id ? 'selected' : ''}>${esc(k.name)}${k.periodicity === 'anual' ? ' (anual)' : ''}</option>`).join('')}</select>`)).join('')}</div>
       <div class="card acc-v"><h3>Rentas por pagar (dato global de Inteligencia Comercial)</h3><p class="small muted">Rentas que debe pagar toda la compañía cada mes. El KPI "Rentas Pagadas" compara la suma de lo que capturan todos los ejecutivos contra este total × los meses del trimestre.</p><div class="fields">${formField('Rentas FIJAS al mes (incluye bodegas)', `<input id="p_rfij" type="number" min="0" value="${s.rentasMesFijas ?? 0}">`)}${formField('Rentas VARIABLES al mes', `<input id="p_rvar" type="number" min="0" value="${s.rentasMesVariables ?? 0}">`)}</div><div class="small muted">Total al mes: <b>${fmtNum((Number(s.rentasMesFijas) || 0) + (Number(s.rentasMesVariables) || 0))}</b> · Trimestre (× ${q ? monthsOfQuarter(q.id).length : 3} meses): <b>${fmtNum(((Number(s.rentasMesFijas) || 0) + (Number(s.rentasMesVariables) || 0)) * (q ? monthsOfQuarter(q.id).length : 3))}</b></div></div>
+      <div class="card acc-g"><h3>KPIs corporativos (Meta anual corporativa)</h3><p class="small muted">Correo de la persona que puede actualizar el avance de los KPIs en modo corporativo. Los demás solo lo ven. Varios correos separados por coma.</p>${formField('Responsable de actualizar', `<input id="p_corp" value="${esc(s.kpiCorporativoEditor || '')}" placeholder="liliana.rincon@alvaco.com.mx">`)}</div>
       <div class="card acc-o"><h3>Fecha de referencia (opcional)</h3><p class="small muted">Define qué semana se considera "actual". Déjala vacía para usar la fecha real del equipo (hoy: ${fmtDate(todayISO())}). Útil para probar el flujo de semanas.</p>${formField('Fecha de referencia', `<input id="p_sim" type="date" value="${s.simDate || ''}">`)}<button class="btn ghost sm" onclick="document.getElementById('p_sim').value=''">Usar fecha real</button></div>
     </div>
     <div class="row mt16"><button class="btn" onclick="saveSettings()">${ICONS.save}Guardar parámetros</button><button class="btn sec" onclick="exportWorkbook(buildExportSheets('${q.id}'),'KPIs_${esc(q.code).replace(/\s/g, '_')}.xlsx')">${ICONS.download}Exportar periodo actual a Excel</button><button class="btn ghost" onclick="exportJSON()">${ICONS.download}Descargar copia (JSON)</button></div>
@@ -1954,7 +2015,7 @@ VIEWS['ADMIN:parametros'] = (u, q) => {
 };
 function saveSettings() {
   const g = Number($v('p_green')), y = Number($v('p_yellow')); if (!(y < g)) { toast('El umbral amarillo debe ser menor que el verde', 'err'); return; }
-  const n = { defaultGreen: g, defaultYellow: y, weekMode: $v('p_mode'), partialWeeks: $v('p_partial'), appName: $v('p_app').trim(), company: $v('p_company').trim(), reminderText: $v('p_rem').trim(), simDate: $v('p_sim') || null, dashboardTiles: [$v('p_tile0'), $v('p_tile1'), $v('p_tile2')], rentasMesFijas: Number($v('p_rfij')) || 0, rentasMesVariables: Number($v('p_rvar')) || 0 };
+  const n = { defaultGreen: g, defaultYellow: y, weekMode: $v('p_mode'), partialWeeks: $v('p_partial'), appName: $v('p_app').trim(), company: $v('p_company').trim(), reminderText: $v('p_rem').trim(), simDate: $v('p_sim') || null, dashboardTiles: [$v('p_tile0'), $v('p_tile1'), $v('p_tile2')], rentasMesFijas: Number($v('p_rfij')) || 0, rentasMesVariables: Number($v('p_rvar')) || 0, kpiCorporativoEditor: $v('p_corp').trim().toLowerCase() };
   for (const k in n) if (JSON.stringify(DB.settings[k]) !== JSON.stringify(n[k])) { audit('settings', 'global', 'editar', k, DB.settings[k], n[k]); DB.settings[k] = n[k]; }
   saveDB(); render(); toast('Parámetros guardados', 'ok');
 }
@@ -2004,7 +2065,7 @@ const TABLES = ['roles', 'areas', 'positions', 'users', 'quarters', 'reporting_w
 const CLIENT_ONLY = { users: ['password'] };
 function rowToClient(t, r) { const o = {}; for (const k in r) { let v = r[k]; if (NUMERIC_COLS.has(k) && v != null && v !== '') v = Number(v); o[toCamel(k)] = v; } return o; }
 function rowToDb(t, r) { const o = {}; for (const k in r) { if ((CLIENT_ONLY[t] || []).includes(k)) continue; o[toSnake(k)] = r[k] === '' ? null : r[k]; } return o; }
-const SETTINGS_KEYS = ['defaultGreen', 'defaultYellow', 'appName', 'company', 'reminderText', 'dashboardTiles', 'weekMode', 'partialWeeks', 'simDate', 'rentasMesFijas', 'rentasMesVariables'];
+const SETTINGS_KEYS = ['defaultGreen', 'defaultYellow', 'appName', 'company', 'reminderText', 'dashboardTiles', 'weekMode', 'partialWeeks', 'simDate', 'rentasMesFijas', 'rentasMesVariables', 'kpiCorporativoEditor'];
 
 /* ---------- carga ---------- */
 async function sbLoadAll() {
@@ -2030,7 +2091,7 @@ async function sbLoadAll() {
   });
   const st = await SB.from('settings').select('*'); if (st.error) throw new Error('settings: ' + st.error.message);
   for (const row of st.data) { const k = toCamel(row.key); db.settings[k] = row.value && typeof row.value === 'object' && 'value' in row.value ? row.value.value : row.value; }
-  db.settings = { defaultGreen: 100, defaultYellow: 70, appName: 'Control Semanal de KPIs', company: 'ALVACO · Comercialización', reminderText: 'Tu actualización semanal de KPIs está pendiente.', weekMode: 'lun-vie', partialWeeks: 'excluir', simDate: null, dashboardTiles: [], rentasMesFijas: 0, rentasMesVariables: 0, ...db.settings };
+  db.settings = { defaultGreen: 100, defaultYellow: 70, appName: 'Control Semanal de KPIs', company: 'ALVACO · Comercialización', reminderText: 'Tu actualización semanal de KPIs está pendiente.', weekMode: 'lun-vie', partialWeeks: 'excluir', simDate: null, dashboardTiles: [], rentasMesFijas: 0, rentasMesVariables: 0, kpiCorporativoEditor: '', ...db.settings };
   db.settings.defaultGreen = Number(db.settings.defaultGreen); db.settings.defaultYellow = Number(db.settings.defaultYellow);
   // tarjetas del dashboard: pueden venir como código de KPI (seed) o como id
   db.settings.dashboardTiles = (db.settings.dashboardTiles || []).map(x => (db.kpis.find(k => k.id === x) || db.kpis.find(k => k.code === x) || {}).id).filter(Boolean);
