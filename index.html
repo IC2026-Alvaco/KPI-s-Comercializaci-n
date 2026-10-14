@@ -2009,7 +2009,20 @@ const SETTINGS_KEYS = ['defaultGreen', 'defaultYellow', 'appName', 'company', 'r
 /* ---------- carga ---------- */
 async function sbLoadAll() {
   const db = { settings: {}, audit_logs: [] };
-  const results = await Promise.all(TABLES.map(t => SB.from(t).select('*')));
+  // Supabase entrega máximo 1,000 filas por consulta: se lee por páginas hasta traer TODO (p. ej. 2,776 asignaciones de cadenas)
+  const PAGE = 1000;
+  async function selectAll(t) {
+    const rows = []; let from = 0;
+    while (true) {
+      const res = await SB.from(t).select('*').order('id', { ascending: true }).range(from, from + PAGE - 1);
+      if (res.error) return res;
+      rows.push(...(res.data || []));
+      if (!res.data || res.data.length < PAGE) break;
+      from += PAGE;
+    }
+    return { data: rows, error: null };
+  }
+  const results = await Promise.all(TABLES.map(t => selectAll(t)));
   const OPTIONAL = ['kpi_local_items']; // tablas de versiones nuevas: si aún no existen en la base, se tratan como vacías
   results.forEach((res, i) => {
     if (res.error) { if (OPTIONAL.includes(TABLES[i]) && /schema cache|does not exist/i.test(res.error.message)) { console.warn('Tabla pendiente de crear en Supabase:', TABLES[i]); db[TABLES[i]] = []; return; } throw new Error(`${TABLES[i]}: ${res.error.message}`); }
