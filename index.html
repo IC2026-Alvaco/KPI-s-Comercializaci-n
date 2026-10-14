@@ -74,13 +74,15 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   --sidebar-w:240px;
 }
 *{box-sizing:border-box}
-html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);font-family:'Roboto Condensed',Arial,sans-serif;font-size:15px;line-height:1.4}
+html,body{margin:0;padding:0;background:#F6F8FC;color:var(--txt);font-family:'Roboto Condensed',Arial,sans-serif;font-size:15px;line-height:1.4}
 h1,h2,h3,h4{margin:0}
 .brand-title{font-family:'Luckiest Guy',Impact,sans-serif;text-transform:uppercase;color:var(--azul);letter-spacing:.5px;font-weight:400}
 a{color:var(--azul)}
 button{font-family:inherit;font-size:14px;cursor:pointer}
-input,select,textarea{font-family:inherit;font-size:14px;color:var(--txt);border:1px solid var(--card-b);border-radius:8px;padding:8px 10px;background:#fff;width:100%}
-input:focus,select:focus,textarea:focus{outline:2px solid rgba(63,96,168,.35);border-color:var(--azul)}
+input,select,textarea{font-family:inherit;font-size:15px;color:var(--txt);border:1px solid var(--card-b);border-radius:10px;padding:10px 12px;background:#fff;width:100%;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--azul);box-shadow:0 0 0 4px rgba(63,96,168,.18)}
+input:disabled,select:disabled,textarea:disabled,input[readonly]{background:#EEF2F9;color:var(--azul-osc);border-color:#E3E9F4}
+input::placeholder,textarea::placeholder{color:#9AA3B5}
 input[type=number]{text-align:right}
 label{font-size:13px;color:var(--txt2);display:block;margin-bottom:4px;font-weight:700}
 .hidden{display:none!important}
@@ -92,19 +94,27 @@ label{font-size:13px;color:var(--txt2);display:block;margin-bottom:4px;font-weig
 .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .between{justify-content:space-between}
 .grow{flex:1}
-.grid{display:grid;gap:16px}
+.grid{display:grid;gap:20px}
 .g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}.g5{grid-template-columns:repeat(5,1fr)}.g6{grid-template-columns:repeat(6,1fr)}
 @media(max-width:1200px){.g4,.g5,.g6{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:900px){.g3,.g4,.g5,.g6{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:640px){.grid{grid-template-columns:1fr!important}}
 
 /* LOGIN */
-.login{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#F2F5FB 0%,#F8F5FE 100%);padding:24px}
-.login-box{background:#fff;border:1px solid var(--card-b);border-radius:20px;box-shadow:0 20px 60px rgba(31,56,100,.12);width:min(960px,100%);display:grid;grid-template-columns:320px 1fr;overflow:hidden}
-.login-left{background:linear-gradient(160deg,var(--azul),var(--morado));color:#fff;padding:32px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
-.login-left img{width:220px;max-width:100%}
-.login-left .brand-title{color:#fff;font-size:30px;margin-top:12px}
-.login-right{padding:32px}
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1F3864 0%,#3F60A8 55%,#7B61C4 100%);padding:24px;position:relative;overflow:hidden}
+.login::before,.login::after{content:"";position:absolute;border-radius:50%;pointer-events:none}
+.login::before{width:520px;height:520px;background:rgba(255,255,255,.06);top:-160px;left:-120px}
+.login::after{width:380px;height:380px;background:rgba(15,158,213,.18);bottom:-120px;right:-80px}
+.login-box{background:#fff;border:0;border-radius:28px;box-shadow:0 30px 80px rgba(0,0,0,.35);width:min(980px,100%);display:grid;grid-template-columns:380px 1fr;overflow:hidden;position:relative;z-index:1}
+.login-left{background:linear-gradient(180deg,var(--azul),var(--azul-osc));color:#fff;padding:36px 32px;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;text-align:left;gap:14px}
+.login-left img{width:260px;max-width:100%;align-self:center;filter:drop-shadow(0 20px 30px rgba(0,0,0,.35))}
+.login-left .brand-title{color:#fff;font-size:34px;line-height:1.05;margin-top:0}
+.login-left .steps-l{display:flex;flex-direction:column;gap:8px;font-size:14px;opacity:.95}
+.login-left .steps-l span{display:flex;align-items:center;gap:8px}
+.login-left .steps-l b{width:22px;height:22px;border-radius:50%;background:#fff;color:var(--azul);display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex:none}
+.login-right{padding:40px 44px}
+.login-right .btn{width:100%;justify-content:center;padding:13px 16px;font-size:16px;border-radius:12px}
+.login-right input{padding:13px 14px;font-size:16px;border-radius:12px}
 .user-pick{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px}
 .user-pick button{display:flex;gap:10px;align-items:center;text-align:left;background:var(--card);border:1px solid var(--card-b);border-radius:12px;padding:10px 12px;transition:.15s}
 .user-pick button:hover{border-color:var(--azul);background:#fff;transform:translateY(-1px)}
@@ -114,32 +124,60 @@ label{font-size:13px;color:var(--txt2);display:block;margin-bottom:4px;font-weig
 
 /* SHELL */
 .shell{display:grid;grid-template-columns:var(--sidebar-w) 1fr;min-height:100vh}
-.sidebar{background:#fff;border-right:1px solid var(--card-b);padding:18px 14px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
-.sidebar .logo{display:flex;align-items:center;gap:10px;padding:4px 6px 14px;border-bottom:3px solid var(--azul);margin-bottom:12px}
-.sidebar .logo img{width:44px}
+.sidebar{background:#fff;border-right:1px solid var(--card-b);box-shadow:4px 0 18px rgba(31,56,100,.04);padding:18px 14px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden}
+/* Menú largo: la lista se desplaza y el usuario / cerrar sesión quedan siempre visibles abajo */
+.nav{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding-right:2px}
+.sidebar .me{flex:none}
+.sidebar .me-actions{flex:none;display:flex;gap:6px;align-items:center;padding-top:8px}
+.sidebar .me-actions .logoutbtn{margin-left:auto}
+.sidebar .logoutbtn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--card-b);border-radius:8px;padding:6px 9px;background:none;color:var(--azul-osc);font-weight:700;font-size:12px;white-space:nowrap}
+.sidebar .logoutbtn:hover{background:var(--card)}
+.sidebar .logoutbtn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+/* Botón sándwich: oculta / muestra el menú */
+.burger{border:1px solid var(--card-b);background:#fff;border-radius:8px;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;color:var(--azul-osc);cursor:pointer;flex:none}
+.burger:hover{background:var(--card)}
+.burger svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round}
+.sidebar .logo{cursor:pointer;border-radius:10px}
+.sidebar .logo:hover img{transform:scale(1.08)}
+.sidebar .logo img{transition:transform .15s}
+.sidebar .logo .brand-title{white-space:nowrap}
+.burger-float{position:fixed;left:10px;top:10px;z-index:30;display:none;width:46px;height:46px;border-radius:12px;padding:3px;box-shadow:0 2px 8px rgba(31,56,100,.18)}
+.burger-float img{width:100%;height:100%;object-fit:contain}
+.shell.collapsed{grid-template-columns:1fr}
+.shell.collapsed .sidebar{display:none}
+.shell.collapsed .burger-float{display:inline-flex}
+.shell.collapsed .footerbar{left:0}
+.shell.collapsed .main{padding-top:60px}
+.side-backdrop{display:none}
+.sidebar .logo{display:flex;align-items:center;gap:8px;padding:4px 2px 14px 4px;border-bottom:3px solid var(--azul);margin-bottom:12px}
+.sidebar .logo img{width:40px}
 .sidebar .logo .brand-title{font-size:20px;line-height:1}
 .sidebar .logo .sub{font-size:11px;color:var(--txt2);text-transform:uppercase;letter-spacing:1px}
 .nav a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:var(--txt);text-decoration:none;font-weight:700;font-size:15px;margin-bottom:2px}
 .nav a svg{width:18px;height:18px;stroke:var(--azul);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .nav a:hover{background:var(--card)}
-.nav a.active{background:var(--card);color:var(--azul-osc);box-shadow:inset 4px 0 0 var(--azul)}
+.nav a.active{background:linear-gradient(90deg,#EAF0FA,#fff);color:var(--azul-osc);box-shadow:inset 4px 0 0 var(--azul)}
+.nav a{transition:background .15s}
 .nav .sec{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--txt2);padding:12px 12px 4px}
 .sidebar .me{margin-top:auto;border-top:1px solid var(--card-b);padding-top:12px;display:flex;gap:10px;align-items:center}
 .sidebar .me .n{font-weight:700;font-size:14px;line-height:1.1}
 .sidebar .me .r{font-size:12px;color:var(--txt2)}
-.main{padding:24px 28px 90px;min-width:0}
-.topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;padding-bottom:10px;border-bottom:3px solid var(--azul);margin-bottom:20px}
-.topbar h1{font-size:32px;line-height:1}
+.main{padding:28px 32px 90px;min-width:0;animation:viewin .18s ease-out}
+@keyframes viewin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;padding-bottom:12px;border-bottom:3px solid var(--azul);margin-bottom:24px}
+.topbar h1{font-size:38px;line-height:1}
 .topbar .sub{color:var(--txt2);font-size:14px;margin-top:6px}
 .ctx{display:flex;gap:8px;flex-wrap:wrap}
-.ctx .chip{background:var(--card);border:1px solid var(--card-b);border-radius:999px;padding:5px 12px;font-size:13px;color:var(--azul-osc);font-weight:700}
+.ctx .chip{background:#fff;border:1px solid var(--card-b);border-radius:999px;padding:6px 14px;font-size:13px;color:var(--azul-osc);font-weight:700;box-shadow:0 2px 6px rgba(31,56,100,.06)}
 .ctx .chip.m{background:var(--lila);border-color:var(--lila-b);color:var(--morado-osc)}
 .footerbar{position:fixed;left:var(--sidebar-w);right:0;bottom:0;height:34px;background:var(--azul);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-size:11px;z-index:5}
 .footerbar b{font-family:'Luckiest Guy',Impact,sans-serif;font-weight:400;letter-spacing:.5px;font-size:13px}
-@media(max-width:900px){.shell{grid-template-columns:1fr}.sidebar{position:relative;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center}.sidebar .logo{border:none;margin:0;padding:0}.nav{display:flex;flex-wrap:wrap;gap:2px}.nav .sec{display:none}.sidebar .me{margin:0;border:0;padding:0;margin-left:auto}.footerbar{left:0}.main{padding:16px}}
+/* Pantallas chicas: el menú es un cajón lateral que se abre con el sándwich */
+@media(max-width:900px){.shell{grid-template-columns:1fr}.shell .sidebar{position:fixed;left:0;top:0;bottom:0;width:min(300px,85vw);z-index:40;box-shadow:0 0 24px rgba(31,56,100,.25)}.shell.collapsed .sidebar{display:none}.shell:not(.collapsed) .side-backdrop{display:block;position:fixed;inset:0;background:rgba(31,56,100,.35);z-index:35}.footerbar{left:0}.main{padding:60px 16px 90px}.burger-float{display:inline-flex}}
 
 /* CARDS */
-.card{background:var(--card);border:.75px solid var(--card-b);border-radius:14px;padding:16px;position:relative;overflow:hidden}
+.card{background:#fff;border:1px solid var(--card-b);border-radius:16px;padding:18px;position:relative;overflow:hidden;box-shadow:0 4px 18px rgba(31,56,100,.06);transition:transform .15s,box-shadow .15s}
+.card.kpi-tile:hover,.card.kpi-card:hover,.card.click:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(31,56,100,.12)}
 .card::before{content:"";position:absolute;left:0;top:0;right:0;height:5px;background:var(--azul)}
 .card.acc-m::before{background:var(--morado)}.card.acc-c::before{background:var(--celeste)}.card.acc-o::before{background:var(--naranja)}.card.acc-g::before{background:var(--magenta)}.card.acc-v::before{background:var(--verde)}.card.acc-r::before{background:var(--rojo)}.card.acc-y::before{background:#E0A800}
 .card.lila{background:var(--lila2);border-color:var(--lila-b)}
@@ -147,8 +185,9 @@ label{font-size:13px;color:var(--txt2);display:block;margin-bottom:4px;font-weig
 .card.flat::before{display:none}
 .card h3{font-size:17px;color:var(--azul-osc);font-weight:700;margin-bottom:8px}
 .card .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--txt2);font-weight:700}
-.kpi-tile .big{font-size:34px;font-weight:700;color:var(--azul-osc);line-height:1.1;margin:6px 0 2px}
+.kpi-tile .big{font-family:'Luckiest Guy',Impact,sans-serif;font-weight:400;font-size:40px;color:var(--azul-osc);line-height:1;margin:8px 0 4px;letter-spacing:.5px}
 .kpi-tile .big.m{color:var(--morado-osc)}
+.kpi-tile .big span,.kpi-tile .big small{display:block;font-family:'Roboto Condensed',Arial,sans-serif;font-weight:700;letter-spacing:0;color:var(--txt2);font-size:13px!important;margin-top:4px}
 .kpi-tile .delta{font-size:13px;color:var(--txt2)}
 .stat{display:flex;flex-direction:column}
 .stat .l{font-size:12px;color:var(--txt2);text-transform:uppercase;letter-spacing:.5px}
@@ -160,7 +199,7 @@ label{font-size:13px;color:var(--txt2);display:block;margin-bottom:4px;font-weig
 .kpi-card .desc{font-size:13px;color:var(--txt2)}
 .kpi-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .kpi-stats .stat .v{font-size:19px}
-.progress{height:12px;background:#fff;border:1px solid var(--card-b);border-radius:999px;overflow:hidden;position:relative}
+.progress{height:10px;background:#E9EEF8;border:0;border-radius:999px;overflow:hidden;position:relative}
 .progress>i{display:block;height:100%;background:linear-gradient(90deg,var(--azul),var(--morado));border-radius:999px;transition:width .4s}
 .progress>i.v{background:var(--verde)}.progress>i.y{background:#E0A800}.progress>i.r{background:var(--rojo)}
 .progress .tick{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--azul-osc);opacity:.6}
@@ -180,8 +219,10 @@ label{font-size:13px;color:var(--txt2);display:block;margin-bottom:4px;font-weig
 .dot.v{background:var(--verde)}.dot.y{background:#E0A800}.dot.r{background:var(--rojo)}.dot.g{background:#BBB}
 
 /* BUTTONS */
-.btn{border:1px solid var(--azul);background:var(--azul);color:#fff;border-radius:10px;padding:9px 16px;font-weight:700;display:inline-flex;align-items:center;gap:8px;transition:.15s;text-decoration:none;line-height:1}
-.btn:hover{filter:brightness(1.08)}
+.btn{border:1px solid var(--azul);background:var(--azul);color:#fff;border-radius:10px;padding:10px 16px;font-weight:700;display:inline-flex;align-items:center;gap:8px;transition:.15s;text-decoration:none;line-height:1;box-shadow:0 6px 16px rgba(63,96,168,.22)}
+.btn:hover{filter:brightness(1.06);transform:translateY(-1px);box-shadow:0 8px 20px rgba(63,96,168,.28)}
+.btn.sec,.btn.ghost,.btn.danger,.btn.sm{box-shadow:none}
+.btn.mor{box-shadow:0 6px 16px rgba(123,97,196,.28)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn.sec{background:#fff;color:var(--azul);border-color:var(--azul)}
 .btn.mor{background:var(--morado);border-color:var(--morado)}
@@ -195,12 +236,13 @@ label{font-size:13px;color:var(--txt2);display:block;margin-bottom:4px;font-weig
 .iconbtn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 /* TABLES */
-.tbl-wrap{overflow:auto;border:1px solid var(--card-b);border-radius:12px;background:#fff}
+.tbl-wrap{overflow:auto;border:1px solid var(--card-b);border-radius:14px;background:#fff;box-shadow:0 4px 18px rgba(31,56,100,.05)}
 table.tbl{width:100%;border-collapse:collapse;font-size:14px}
-table.tbl th{background:var(--card);color:var(--azul-osc);text-align:left;padding:10px 12px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--card-b);white-space:nowrap;position:sticky;top:0}
-table.tbl td{padding:9px 12px;border-bottom:1px solid #EEF1F7;vertical-align:middle}
+table.tbl th{background:var(--card);color:#4A5568;text-align:left;padding:11px 12px;font-size:11.5px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--card-b);white-space:nowrap;position:sticky;top:0}
+table.tbl td{padding:11px 12px;border-bottom:1px solid #EEF1F7;vertical-align:middle}
+table.tbl tbody tr:nth-child(even) td{background:#FBFCFE}
 table.tbl tr:last-child td{border-bottom:none}
-table.tbl tr:hover td{background:#FAFBFE}
+table.tbl tr:hover td{background:#F2F5FB}
 table.tbl td.num,table.tbl th.num{text-align:right;font-variant-numeric:tabular-nums}
 table.tbl tr.click{cursor:pointer}
 table.tbl .mini-bar{height:8px;background:var(--card);border-radius:999px;overflow:hidden;min-width:80px}
@@ -210,7 +252,7 @@ table.tbl .mini-bar i{display:block;height:100%;background:var(--azul);border-ra
 
 /* WEEK LIST */
 .weeks{display:grid;gap:8px}
-.week{display:grid;grid-template-columns:70px 1fr auto auto;gap:12px;align-items:center;background:#fff;border:1px solid var(--card-b);border-radius:12px;padding:10px 14px}
+.week{display:grid;grid-template-columns:70px 1fr auto auto;gap:12px;align-items:center;background:#fff;border:1px solid var(--card-b);border-radius:14px;padding:12px 16px;box-shadow:0 2px 10px rgba(31,56,100,.04)}
 .week.current{border-color:var(--morado);box-shadow:0 0 0 3px rgba(123,97,196,.15)}
 .week .n{font-weight:700;color:var(--azul-osc);font-size:15px}
 .week .d{color:var(--txt2);font-size:13px}
@@ -233,13 +275,13 @@ table.tbl .mini-bar i{display:block;height:100%;background:var(--azul);border-ra
 
 /* MODAL */
 .modal-bg{position:fixed;inset:0;background:rgba(31,56,100,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
-.modal{background:#fff;border-radius:18px;width:min(820px,100%);max-height:92vh;overflow:auto;box-shadow:0 30px 80px rgba(0,0,0,.3)}
+.modal{background:#fff;border-radius:22px;width:min(820px,100%);max-height:92vh;overflow:auto;box-shadow:0 30px 80px rgba(0,0,0,.3)}
 .modal.wide{width:min(1100px,100%)}
 .modal-h{padding:18px 22px 12px;border-bottom:3px solid var(--azul);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;z-index:2}
 .modal-h h2{font-size:24px}
 .modal-h .brand-title{font-size:24px}
 .modal-b{padding:20px 22px}
-.modal-f{padding:14px 22px;border-top:1px solid var(--card-b);display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:#fff}
+.modal-f{padding:14px 22px;border-top:1px solid var(--card-b);display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:#fff;box-shadow:0 -8px 24px rgba(31,56,100,.08)}
 .closex{background:none;border:none;font-size:26px;color:var(--txt2);line-height:1}
 .field{margin-bottom:12px}
 .fields{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
@@ -247,12 +289,12 @@ table.tbl .mini-bar i{display:block;height:100%;background:var(--azul);border-ra
 @media(max-width:640px){.fields,.fields.c3{grid-template-columns:1fr}}
 
 /* CAPTURE */
-.capture-kpi{background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:14px 16px;margin-bottom:14px;position:relative;overflow:hidden}
-.capture-kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--azul)}
+.capture-kpi{background:#fff;border:1px solid var(--card-b);border-radius:16px;padding:16px 18px 16px 20px;margin-bottom:16px;position:relative;overflow:hidden;box-shadow:0 4px 18px rgba(31,56,100,.06)}
+.capture-kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--azul)}
 .capture-kpi.ok::before{background:var(--verde)}.capture-kpi.err::before{background:var(--rojo)}.capture-kpi.warn::before{background:#E0A800}
 .capture-kpi .kh{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
 .capture-kpi .kh .t{font-weight:700;font-size:16px;color:var(--azul-osc)}
-.breakdown{background:#fff;border:1px dashed var(--lila-b);border-radius:12px;padding:12px;margin-top:10px}
+.breakdown{background:var(--card);border:1px dashed var(--card-b);border-radius:12px;padding:14px;margin-top:12px}
 .breakdown h4{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--morado-osc);margin-bottom:8px}
 .bd-row{display:grid;grid-template-columns:1fr 120px 32px;gap:8px;align-items:center;margin-bottom:6px}
 .bd-total{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--card-b)}
@@ -265,7 +307,7 @@ table.tbl .mini-bar i{display:block;height:100%;background:var(--azul);border-ra
 .msg svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
 
 /* CHART */
-.chart-box{background:#fff;border:1px solid var(--card-b);border-radius:14px;padding:14px 16px}
+.chart-box{background:#fff;border:1px solid var(--card-b);border-radius:16px;padding:16px 18px;box-shadow:0 4px 18px rgba(31,56,100,.06)}
 .chart-box h3{font-size:15px;color:var(--azul-osc);margin-bottom:2px}
 .chart-box .sub{font-size:12px;color:var(--txt2);margin-bottom:8px}
 .chart-box canvas{max-height:280px}
@@ -275,15 +317,16 @@ table.tbl .mini-bar i{display:block;height:100%;background:var(--azul);border-ra
 .legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
 
 /* MISC */
-.toast{position:fixed;right:20px;bottom:50px;background:var(--azul-osc);color:#fff;padding:12px 18px;border-radius:12px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.2);z-index:100;animation:in .2s}
+.toast{position:fixed;right:20px;bottom:50px;background:var(--azul-osc);color:#fff;padding:13px 20px;border-radius:14px;font-weight:700;box-shadow:0 14px 40px rgba(0,0,0,.25);z-index:100;animation:in .25s;border-left:6px solid var(--celeste)}
+.toast.err{border-left-color:#FDECEA}.toast.ok{border-left-color:#C8E6CF}
 .toast.err{background:var(--rojo)}.toast.ok{background:var(--verde)}
 @keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:12px 14px;margin-bottom:16px}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;background:#fff;border:1px solid var(--card-b);border-radius:16px;padding:14px 16px;margin-bottom:20px;box-shadow:0 4px 18px rgba(31,56,100,.05)}
 .filters .f{min-width:150px;flex:1}
 .filters label{margin-bottom:3px}
 .empty{display:flex;gap:16px;align-items:center;background:var(--lila2);border:1px solid var(--lila-b);border-radius:14px;padding:16px 20px;color:var(--morado-osc);font-weight:700}
 .empty img{width:90px}
-.hero{display:flex;gap:20px;align-items:center;background:linear-gradient(120deg,#F2F5FB,#F8F5FE);border:1px solid var(--card-b);border-radius:16px;padding:14px 22px;margin-bottom:18px}
+.hero{display:flex;gap:20px;align-items:center;background:linear-gradient(120deg,#fff,#F3EEFC);border:1px solid var(--lila-b);border-radius:18px;padding:16px 24px;margin-bottom:22px;box-shadow:0 4px 18px rgba(31,56,100,.06)}
 .hero img{width:96px;flex:none}
 .hero .t{font-size:18px;font-weight:700;color:var(--morado-osc)}
 .hero .s{color:var(--txt2);font-size:14px}
@@ -303,6 +346,13 @@ table.tbl .mini-bar i{display:block;height:100%;background:var(--azul);border-ra
 .drill{cursor:pointer;text-decoration:underline dotted;color:var(--azul)}
 .note{font-size:12px;color:var(--txt2);margin-top:6px}
 @media print{.sidebar,.footerbar,.btn{display:none!important}.shell{grid-template-columns:1fr}}
+/* iconos inline fuera de botones/menú (p. ej. títulos de grupo en Metas) */
+b > svg, h3 > svg, .row > b svg, .eyebrow svg, .modal-h svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px;margin-right:4px}
+
+/* detalle por local (KPI Locales) */
+.loc-row{border:1px solid var(--card-b);border-left:5px solid var(--azul);border-radius:10px;padding:10px 14px;margin-bottom:8px;background:#fff}
+.loc-row.fast{border-left-color:var(--verde)}.loc-row.slow{border-left-color:var(--rojo)}
+.loc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 
 </style>
 </head>
@@ -417,6 +467,23 @@ function chainsOf(userId) {
 function submissionOf(userId, weekId) { return DB.weekly_submissions.find(s => s.userId === userId && s.weekId === weekId); }
 function valuesOf(subId) { return where('weekly_kpi_values', v => v.submissionId === subId); }
 function breakdownsOf(valueId) { return where('kpi_chain_breakdowns', b => b.weeklyKpiValueId === valueId); }
+/* KPI con captura por local (Locales): un renglón por local instalado */
+const isLocalesKpi = (k) => !!k && k.captureMode === 'locales';
+/* KPI anual tipo lista (p. ej. Cambio de rentas fijas a variables): se escriben los clientes, uno por renglón, y el avance es cuántos son */
+const isListaKpi = (k) => !!k && k.captureMode === 'lista';
+/* Ratio de conteos semanales (ambos acumulados, p. ej. Costos locales): el denominador puede ser 0 en una semana sin actividad */
+/* Rentas pagadas (conjunto): cada quien captura sus rentas fijas y variables pagadas; el KPI compara la suma de TODOS contra el global del trimestre que da IC */
+const isConjuntoKpi = (k) => !!k && k.captureMode === 'conjunto';
+function rentasGlobalTrimestre(qid) { const f = Number(DB.settings.rentasMesFijas) || 0, v = Number(DB.settings.rentasMesVariables) || 0; const m = qid ? monthsOfQuarter(qid).length || 3 : 3; return { fijas: f, variables: v, mes: f + v, meses: m, trimestre: (f + v) * m }; }
+function parseFV(detail) { const m = /Fijas:\s*([\d.]+).*Variables:\s*([\d.]+)/i.exec(detail || ''); return m ? { fijas: Number(m[1]), variables: Number(m[2]) } : { fijas: '', variables: '' }; }
+/* Equipos parados: pendientes de la semana anterior + nuevos = tenían; se capturan los resueltos y el resto pasa a la siguiente semana */
+const isParadosKpi = (k) => !!k && k.captureMode === 'parados';
+function paradosPendientesPrevios(userId, kpiId, qid, weekNumber) { const r = computeKpi(userId, kpiId, qid, weekNumber - 1, { includeDraft: true }); const last = [...r.series].reverse().find(x => x.raw && x.raw.denominator != null); return last ? Math.max(0, (Number(last.raw.denominator) || 0) - (Number(last.raw.numerator) || 0)) : 0; }
+const isConteoKpi = (k) => !!k && k.type === 'C' && k.numeratorMode === 'acumulado' && k.denominatorMode === 'acumulado';
+function listaLines(txt) { return String(txt || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean); }
+function localItemsOf(valueId) { return where('kpi_local_items', b => b.weeklyKpiValueId === valueId).sort((a, b) => a.seq - b.seq); }
+const localItemFast = (it) => Number(it.installDays) <= 30;
+const LOCAL_KINDS = { nuevo: { label: 'Local nuevo', dateLabel: 'Fecha en que llegó el contrato o carta de entrada' }, reacondicionado: { label: 'Local reacondicionado', dateLabel: 'Fecha en que se pidió permiso para entrar al local' } };
 const COUNTED = ['enviado', 'cerrado', 'reabierto'];
 
 /* ---------- auditoría ---------- */
@@ -449,17 +516,31 @@ function semaforo(pct, thr) {
   if (pct >= thr.yellow) return { code: 'amarillo', label: 'En proceso', cls: 'b-amar', dot: 'y' };
   return { code: 'rojo', label: 'Pendiente', cls: 'b-rojo', dot: 'r' };
 }
-function requiresBreakdown(kpi, t) { return t && t.requiresBreakdown != null ? !!t.requiresBreakdown : !!kpi.requiresChainBreakdown; }
+function requiresBreakdown(kpi, t) { if (isListaKpi(kpi) || isLocalesKpi(kpi)) return false; return t && t.requiresBreakdown != null ? !!t.requiresBreakdown : !!kpi.requiresChainBreakdown; }
 function pctOf(kpi, meta, current) { if (!(meta > 0) || current == null) return null; return kpi.direction === 'menor' ? (current > 0 ? meta / current * 100 : null) : current / meta * 100; }
 
 /* Núcleo: evalúa un KPI trimestral sobre un conjunto ordenado de semanas (pueden ser de varios trimestres). */
 function computeKpiRange(userId, kpiId, weeks, meta, t, opts = {}) {
   const kpi = byId('kpis', kpiId); const includeDraft = !!opts.includeDraft;
-  const series = []; let acum = 0, lastSnap = null, numAcum = 0, denAcum = 0, denSnap = null;
+  const series = []; let acum = 0, lastSnap = null, numAcum = 0, denAcum = 0, denSnap = null, resAcum = 0, resPrev = 0;
+  const conjunto = isConjuntoKpi(kpi), parados = isParadosKpi(kpi);
+  const qid = weeks.length ? weeks[0].quarterId : null;
+  const teamIds = conjunto && qid ? DB.user_kpi_targets.filter(x => x.kpiId === kpiId && x.quarterId === qid && x.active !== false).map(x => x.userId) : [];
+  const globalDen = conjunto && qid ? rentasGlobalTrimestre(qid).trimestre : 0;
   for (const w of weeks) {
     const s = submissionOf(userId, w.id); let v = null;
     if (s && (COUNTED.includes(s.status) || (includeDraft && s.status === 'borrador'))) v = valuesOf(s.id).find(x => x.kpiId === kpiId) || null;
     let weekValue = null;
+    if (conjunto) {
+      // suma de todo el equipo (quien haya enviado) contra el global del trimestre
+      for (const uid2 of teamIds) { const s2 = submissionOf(uid2, w.id); if (!s2 || !(COUNTED.includes(s2.status) || (includeDraft && s2.status === 'borrador'))) continue; const v2 = valuesOf(s2.id).find(x => x.kpiId === kpiId); if (v2 && v2.numerator != null) numAcum += Number(v2.numerator) || 0; }
+      const den = globalDen || (v && v.denominator) || 0; weekValue = den > 0 ? numAcum / den * 100 : null;
+      series.push({ week: w, value: weekValue, raw: v, acum: weekValue, teamNum: numAcum, teamDen: den }); continue;
+    }
+    if (parados) {
+      if (v && v.denominator != null) { const num = Number(v.numerator) || 0, den = Number(v.denominator) || 0; resAcum += num; const total = den + resPrev; weekValue = total > 0 ? resAcum / total * 100 : null; resPrev = resAcum; }
+      series.push({ week: w, value: weekValue, raw: v, acum: weekValue }); continue;
+    }
     if (v) {
       if (kpi.type === 'A') { weekValue = Number(v.value) || 0; acum += weekValue; }
       else if (kpi.type === 'B') { if (v.denominator > 0) { weekValue = v.numerator / v.denominator * 100; lastSnap = weekValue; } }
@@ -569,7 +650,7 @@ function groupSum(rows, keyFn, labelFn) {
 /* ---------- captura de KPI anual (bitácora: cada modificación queda con fecha, hora y usuario) ---------- */
 function saveAnnualEntry(userId, kpiId, year, data) {
   const kpi = byId('kpis', kpiId); const prev = computeAnnualKpi(userId, kpiId, year, { cutoff: '9999' }).last;
-  const e = { id: uid('ae'), userId, kpiId, year, value: data.value ?? null, numerator: data.numerator ?? null, denominator: data.denominator ?? null, comment: data.comment || '', ts: nowISO(), createdBy: SESSION.userId };
+  const e = { id: uid('ae'), userId, kpiId, year, value: data.value ?? null, numerator: data.numerator ?? null, denominator: data.denominator ?? null, comment: data.comment || '', detail: data.detail ?? null, ts: nowISO(), createdBy: SESSION.userId };
   if (kpi.type !== 'A' && e.denominator > 0) e.value = e.numerator / e.denominator * 100;
   DB.annual_kpi_entries.push(e);
   audit('annual_kpi_entries', e.id, prev ? 'actualizar' : 'crear', `${kpi.name} ${year}`, prev ? (kpi.type === 'A' ? prev.value : `${prev.numerator}/${prev.denominator}`) : null, kpi.type === 'A' ? e.value : `${e.numerator}/${e.denominator}`);
@@ -614,13 +695,29 @@ function validateCapture(user, week, payload, mode = 'enviar') {
   const assigned = new Set(chainsOf(user.id).map(c => c.id));
   for (const t of ts) {
     const kpi = byId('kpis', t.kpiId); const p = payload[t.kpiId] || {}; const e = [];
-    const has = kpi.type === 'A' ? (p.value !== '' && p.value != null) : (p.numerator !== '' && p.numerator != null && p.denominator !== '' && p.denominator != null);
+    const locales = isLocalesKpi(kpi);
+    const has = locales ? (p.value !== '' && p.value != null) : isConjuntoKpi(kpi) ? (p.fijas !== '' && p.fijas != null && p.variables !== '' && p.variables != null) : kpi.type === 'A' ? (p.value !== '' && p.value != null) : (p.numerator !== '' && p.numerator != null && p.denominator !== '' && p.denominator != null);
     if (!has) { if (mode === 'enviar') e.push('Falta captura'); }
+    else if (isConjuntoKpi(kpi)) { if (Number(p.fijas) < 0 || Number(p.variables) < 0 || isNaN(Number(p.fijas)) || isNaN(Number(p.variables))) e.push('Rentas fijas y variables deben ser números ≥ 0'); }
+    else if (isParadosKpi(kpi)) { if (Number(p.numerator) < 0 || Number(p.denominator) < 0) e.push('No se permiten valores negativos'); if (Number(p.numerator) > Number(p.denominator)) e.push(`${kpi.name}: los resueltos no pueden ser más que los que tenían`); }
+    else if (locales) {
+      const n = Number(p.value); const items = p.items || [];
+      if (isNaN(n) || n < 0 || n !== Math.floor(n)) e.push('Indica un número entero de locales instalados');
+      else if (items.length !== n) e.push(`Se reportaron ${n} locales y hay ${items.length} con detalle`);
+      items.forEach((it, j) => {
+        const faltan = [];
+        if (!LOCAL_KINDS[it.kind]) faltan.push('tipo (nuevo / reacondicionado)');
+        if (!it.referenceDate || !/^\d{4}-\d{2}-\d{2}$/.test(it.referenceDate)) faltan.push('fecha');
+        if (it.installDays === '' || it.installDays == null || isNaN(Number(it.installDays)) || Number(it.installDays) < 0 || Number(it.installDays) !== Math.floor(Number(it.installDays))) faltan.push('días de instalación');
+        if (faltan.length && mode === 'enviar') e.push(`Local ${j + 1}: falta ${faltan.join(', ')}`);
+      });
+    }
     else {
       if (kpi.type === 'A') { if (Number(p.value) < 0) e.push('No se permiten cantidades negativas'); if (isNaN(Number(p.value))) e.push('Valor no numérico'); }
       else {
         if (Number(p.numerator) < 0 || Number(p.denominator) < 0) e.push('No se permiten valores negativos');
-        if (Number(p.denominator) === 0) e.push('El denominador no puede ser cero');
+        if (Number(p.denominator) === 0 && !isConteoKpi(kpi)) e.push('El denominador no puede ser cero');
+        if (isConteoKpi(kpi) && Number(p.numerator) > Number(p.denominator)) e.push(`${kpi.name}: la cantidad de la segunda pregunta no puede ser mayor que la de la primera`);
         if (kpi.type === 'B' && Number(p.numerator) > Number(p.denominator)) warnings.push(`${kpi.name}: el numerador excede al denominador`);
       }
       if (requiresBreakdown(kpi, t) && kpi.type === 'A') {
@@ -658,10 +755,26 @@ function saveCapture(user, week, payload, mode) {
     const kpi = byId('kpis', t.kpiId); const p = payload[t.kpiId]; if (!p) continue;
     let v = valuesOf(s.id).find(x => x.kpiId === t.kpiId);
     const num = (x) => (x === '' || x == null) ? null : Number(x);
-    const nv = { value: kpi.type === 'A' ? num(p.value) : (num(p.numerator) != null && num(p.denominator) ? num(p.numerator) / num(p.denominator) * 100 : null), numerator: num(p.numerator), denominator: num(p.denominator), comment: p.comment || '' };
+    let nv;
+    if (isLocalesKpi(kpi)) {
+      const items = (p.items || []); const den = num(p.value); const numer = den == null ? null : items.filter(localItemFast).length;
+      nv = { value: den > 0 ? numer / den * 100 : null, numerator: numer, denominator: den, comment: p.comment || '' };
+    } else nv = { value: kpi.type === 'A' ? num(p.value) : (num(p.numerator) != null && num(p.denominator) ? num(p.numerator) / num(p.denominator) * 100 : null), numerator: num(p.numerator), denominator: num(p.denominator), comment: p.comment || '', detail: isListaKpi(kpi) ? (listaLines(p.detail).join('\n') || null) : null };
+    if (isListaKpi(kpi)) nv.value = listaLines(p.detail).length;
+    if (isConjuntoKpi(kpi)) { const f = num(p.fijas) || 0, va = num(p.variables) || 0; const g = rentasGlobalTrimestre(week.quarterId); nv.numerator = f + va; nv.denominator = g.trimestre || null; nv.value = g.trimestre > 0 ? (f + va) / g.trimestre * 100 : null; nv.detail = `Fijas: ${f} | Variables: ${va}`; }
     if (!v) { v = { id: uid('val'), submissionId: s.id, kpiId: t.kpiId, ...nv }; DB.weekly_kpi_values.push(v); audit('weekly_kpi_values', v.id, 'crear', kpi.name, null, kpi.type === 'A' ? nv.value : `${nv.numerator}/${nv.denominator}`); }
     else {
-      for (const f of ['value', 'numerator', 'denominator', 'comment']) { if ((v[f] ?? null) !== (nv[f] ?? null)) { audit('weekly_kpi_values', v.id, 'editar', `${kpi.name}.${f}`, v[f], nv[f]); v[f] = nv[f]; } }
+      for (const f of ['value', 'numerator', 'denominator', 'comment', 'detail']) { if ((v[f] ?? null) !== (nv[f] ?? null)) { audit('weekly_kpi_values', v.id, 'editar', `${kpi.name}.${f}`, v[f], nv[f]); v[f] = nv[f]; } }
+    }
+    // detalle por local (KPI Locales)
+    if (isLocalesKpi(kpi)) {
+      const old = localItemsOf(v.id); const items = (p.items || []).map((it, j) => ({ seq: j + 1, kind: it.kind, referenceDate: it.referenceDate, installDays: Number(it.installDays), note: it.note || null }));
+      for (const ob of old) { if (ob.seq > items.length) { audit('kpi_local_items', ob.id, 'eliminar', `${kpi.name} local ${ob.seq}`, `${ob.kind} ${ob.referenceDate} ${ob.installDays}d`, null); DB.kpi_local_items = DB.kpi_local_items.filter(x => x.id !== ob.id); } }
+      for (const it of items) {
+        const ex = localItemsOf(v.id).find(x => x.seq === it.seq);
+        if (ex) { for (const f of ['kind', 'referenceDate', 'installDays', 'note']) { if ((ex[f] ?? null) !== (it[f] ?? null)) { audit('kpi_local_items', ex.id, 'editar', `${kpi.name} local ${it.seq}.${f}`, ex[f], it[f]); ex[f] = it[f]; } } }
+        else { const r = { id: uid('loc'), weeklyKpiValueId: v.id, ...it }; DB.kpi_local_items.push(r); audit('kpi_local_items', r.id, 'crear', `${kpi.name} local ${it.seq}`, null, `${it.kind} ${it.referenceDate} ${it.installDays}d`); }
+      }
     }
     // desglose
     if (requiresBreakdown(kpi, t) && kpi.type === 'A') {
@@ -700,7 +813,7 @@ function seedDatabase() {
     areas: [{ id: 'a_nte', name: 'Célula Norte' }, { id: 'a_cen', name: 'Célula Centro' }, { id: 'a_sur', name: 'Célula Sur-Sureste' }, { id: 'a_nac', name: 'Cuentas Nacionales' }, { id: 'a_ic', name: 'Inteligencia Comercial' }, { id: 'a_dir', name: 'Dirección Comercial' }],
     positions: [{ id: 'p_ecs', name: 'Ejecutivo Comercial Sr.' }, { id: 'p_ec', name: 'Ejecutivo Comercial' }, { id: 'p_kam', name: 'Key Account Manager' }, { id: 'p_ger', name: 'Gerente Regional' }, { id: 'p_coord', name: 'Coordinador de IC' }, { id: 'p_dir', name: 'Director Comercial' }],
     users: [], quarters: [], reporting_weeks: [], kpis: [], user_kpi_targets: [], chains: [], user_chain_assignments: [], chain_requests: [],
-    weekly_submissions: [], weekly_kpi_values: [], kpi_chain_breakdowns: [], annual_kpi_entries: [], audit_logs: []
+    weekly_submissions: [], weekly_kpi_values: [], kpi_chain_breakdowns: [], kpi_local_items: [], annual_kpi_entries: [], audit_logs: []
   };
   const U = (id, name, email, roleId, areaId, positionId) => db.users.push({ id, name, email, password: '1234', roleId, areaId, positionId, active: true, createdAt: '2026-09-01T09:00:00Z' });
   U('u_admin', 'David Castillo', 'david.castillo@alvaco.com.mx', 'r_admin', 'a_ic', 'p_coord');
@@ -848,6 +961,8 @@ const ICONS = {
   unlock: '<svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>',
   trash: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
   logout: '<svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>',
+  menu: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>',
+  close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   bell: '<svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
   eye: '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
   refresh: '<svg viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg>',
@@ -937,7 +1052,7 @@ function exportWorkbook(sheets, filename) {
 function buildExportSheets(qid) {
   const q = byId('quarters', qid); const weeks = weeksOf(qid); const ex = execs();
   const resumen = [['Ejecutivo', 'Puesto', 'Célula', 'KPI', 'Tipo', 'Unidad', 'Meta', 'Peso %', 'Avance', '% Cumplimiento', 'Semáforo', 'Cumplimiento ponderado ejecutivo']];
-  const porSemana = [['Semana', 'Inicio', 'Fin', 'Ejecutivo', 'KPI', 'Valor semana', 'Numerador', 'Denominador', 'Acumulado', 'Estado captura', 'Fecha envío', 'Comentario']];
+  const porSemana = [['Semana', 'Inicio', 'Fin', 'Ejecutivo', 'KPI', 'Valor semana', 'Numerador', 'Denominador', 'Acumulado', 'Estado captura', 'Fecha envío', 'Detalle (nombres)', 'Comentario']];
   const porCadena = [['Semana', 'Ejecutivo', 'KPI', 'Cadena', 'Cantidad']];
   const base = [['Periodo', 'Semana', 'Inicio', 'Fin', 'EjecutivoID', 'Ejecutivo', 'Puesto', 'Célula', 'KPIID', 'KPI', 'Tipo', 'Unidad', 'Meta', 'Peso', 'Valor', 'Numerador', 'Denominador', 'CadenaID', 'Cadena', 'Cantidad cadena', 'Estado', 'Fecha envío']];
   for (const u of ex) {
@@ -948,7 +1063,7 @@ function buildExportSheets(qid) {
       for (const v of valuesOf(s.id)) {
         const kpi = byId('kpis', v.kpiId); const t = kpiTarget(u.id, v.kpiId, qid);
         const k = computeKpi(u.id, v.kpiId, qid, w.number, { includeDraft: true });
-        porSemana.push([w.number, w.startDate, w.endDate, u.name, kpi.name, v.value, v.numerator, v.denominator, k.current == null ? '' : +k.current.toFixed(2), s.status, s.submittedAt || '', v.comment || s.comment || '']);
+        porSemana.push([w.number, w.startDate, w.endDate, u.name, kpi.name, v.value, v.numerator, v.denominator, k.current == null ? '' : +k.current.toFixed(2), s.status, s.submittedAt || '', v.detail ? listaLines(v.detail).join(', ') : '', v.comment || s.comment || '']);
         const bds = breakdownsOf(v.id);
         if (bds.length) for (const b of bds) { porCadena.push([w.number, u.name, kpi.name, nameOf('chains', b.chainId), b.quantity]); base.push([q.name, w.number, w.startDate, w.endDate, u.id, u.name, nameOf('positions', u.positionId), nameOf('areas', u.areaId), kpi.id, kpi.name, kpi.type, kpi.unit, t?.target, t?.weight, v.value, v.numerator, v.denominator, b.chainId, nameOf('chains', b.chainId), b.quantity, s.status, s.submittedAt || '']); }
         else base.push([q.name, w.number, w.startDate, w.endDate, u.id, u.name, nameOf('positions', u.positionId), nameOf('areas', u.areaId), kpi.id, kpi.name, kpi.type, kpi.unit, t?.target, t?.weight, v.value, v.numerator, v.denominator, '', '', '', s.status, s.submittedAt || '']);
@@ -959,8 +1074,8 @@ function buildExportSheets(qid) {
   for (const kpi of DB.kpis.filter(k => k.active)) { const ks = ex.map(u => computeKpi(u.id, kpi.id, qid)).filter(k => k.target); if (!ks.length) continue; const pcts = ks.filter(k => k.pct != null).map(k => k.pct); porKpi.push([kpi.name, kpi.type, ks.length, kpi.type === 'A' ? ks.reduce((a, k) => a + k.meta, 0) : '', kpi.type === 'A' ? ks.reduce((a, k) => a + (k.current || 0), 0) : '', pcts.length ? +(pcts.reduce((a, b) => a + b, 0) / pcts.length).toFixed(2) : '']); }
   const year = Number(q.startDate.slice(0, 4));
   const anual = [['Año', 'Ejecutivo', 'KPI', 'Tipo', 'Meta anual', 'Peso %', 'Avance vigente', '% Cumplimiento', 'Semáforo', 'Última actualización', 'Actualizó']];
-  const bitacora = [['Fecha y hora', 'Año', 'Ejecutivo', 'KPI', 'Valor', 'Numerador', 'Denominador', 'Comentario', 'Modificó']];
-  for (const u of ex) { const cu = computeUser(u.id, qid); for (const k of cu.annual) { anual.push([year, u.name, k.kpi.name, k.kpi.type, k.meta, k.weight, k.current == null ? '' : +k.current.toFixed(2), k.pct == null ? '' : +k.pct.toFixed(2), k.sem.label, k.last ? k.last.ts : '', k.last ? nameOf('users', k.last.createdBy, '') : '']); for (const e of k.entries) bitacora.push([e.ts, e.year, u.name, k.kpi.name, e.value, e.numerator, e.denominator, e.comment || '', nameOf('users', e.createdBy, '')]); } }
+  const bitacora = [['Fecha y hora', 'Año', 'Ejecutivo', 'KPI', 'Valor', 'Numerador', 'Denominador', 'Detalle (clientes)', 'Comentario', 'Modificó']];
+  for (const u of ex) { const cu = computeUser(u.id, qid); for (const k of cu.annual) { anual.push([year, u.name, k.kpi.name, k.kpi.type, k.meta, k.weight, k.current == null ? '' : +k.current.toFixed(2), k.pct == null ? '' : +k.pct.toFixed(2), k.sem.label, k.last ? k.last.ts : '', k.last ? nameOf('users', k.last.createdBy, '') : '']); for (const e of k.entries) bitacora.push([e.ts, e.year, u.name, k.kpi.name, e.value, e.numerator, e.denominator, e.detail ? listaLines(e.detail).join(', ') : '', e.comment || '', nameOf('users', e.createdBy, '')]); } }
   const asign = [['Cadena', 'CadenaID', 'Ejecutivo', 'Desde', 'Hasta', 'Estado'], ...DB.user_chain_assignments.map(a => [nameOf('chains', a.chainId), a.chainId, nameOf('users', a.userId), a.startDate || '', a.endDate || '', a.endDate ? 'Anterior' : 'Vigente'])];
   return [{ name: 'Resumen trimestre', rows: resumen }, { name: 'KPIs anuales', rows: anual }, { name: 'Bitacora anuales', rows: bitacora }, { name: 'Detalle por semana', rows: porSemana }, { name: 'Detalle por KPI', rows: porKpi }, { name: 'Detalle por cadena', rows: porCadena }, { name: 'Historial asignacion', rows: asign }, { name: 'Base BI', rows: base }];
 }
@@ -972,11 +1087,15 @@ const MENUS = {
   ADMIN: [['dashboard', 'Dashboard', 'chart'], ['usuarios', 'Usuarios', 'users'], ['kpis', 'KPIs', 'target'], ['metas', 'Metas', 'layers'], ['cadenas', 'Cadenas', 'store'], ['asignaciones', 'Asignaciones', 'link'], ['periodos', 'Periodos', 'cal'], ['semanas', 'Semanas', 'list'], ['parametros', 'Parámetros', 'settings'], ['auditoria', 'Auditoría', 'shield']]
 };
 let ROUTE = { view: null, params: {} };
-function nav(view, params = {}) { ROUTE = { view, params }; location.hash = view; render(); }
+function nav(view, params = {}) { ROUTE = { view, params }; location.hash = view; if (window.innerWidth <= 900) SIDE.collapsed = true; render(); }
 function currentUser() { return SESSION.userId ? byId('users', SESSION.userId) : null; }
 function login(userId) { SESSION.userId = userId; saveSession(); ROUTE = { view: null, params: {} }; render(); }
 function logout() { SESSION.userId = null; saveSession(); ROUTE = { view: null, params: {} }; location.hash = ''; render(); }
 
+/* Menú lateral: en pantallas chicas empieza oculto; en escritorio se recuerda la última elección */
+let SIDE = { collapsed: null };
+function sideCollapsed() { if (SIDE.collapsed == null) { let saved = null; try { saved = localStorage.getItem('kpis_side'); } catch (e) { } SIDE.collapsed = saved != null ? saved === '1' : window.innerWidth <= 900; } return SIDE.collapsed; }
+function toggleSide(force) { SIDE.collapsed = force === true ? true : !sideCollapsed(); try { localStorage.setItem('kpis_side', SIDE.collapsed ? '1' : '0'); } catch (e) { } const sh = document.getElementById('shell'); if (sh) sh.classList.toggle('collapsed', SIDE.collapsed); }
 function render() {
   destroyCharts(); closeModal();
   const app = document.getElementById('app'); const u = currentUser();
@@ -988,11 +1107,13 @@ function render() {
   if (!ROUTE.view || !menu.find(m => m[0] === ROUTE.view && m[0] !== 'sep')) ROUTE = { view: menu[0][0], params: {} };
   const q = activeQuarter(); const cw = q ? currentWeek(q.id) : null;
   const navHTML = menu.map(m => m[0] === 'sep' ? `<div class="sec">${m[1]}</div>` : `<a href="#${m[0]}" class="${ROUTE.view === m[0] ? 'active' : ''}" onclick="nav('${m[0]}');return false;">${ICONS[m[2]]}${m[1]}</a>`).join('');
-  app.innerHTML = `<div class="shell">
+  app.innerHTML = `<div class="shell ${sideCollapsed() ? 'collapsed' : ''}" id="shell">
+    <button class="burger burger-float" title="Mostrar menú" onclick="toggleSide()"><img src="${IMG.peek}" alt="Menú"></button>
+    <div class="side-backdrop" onclick="toggleSide(true)"></div>
     <aside class="sidebar">
-      <div class="logo"><img src="${IMG.peek}" alt=""><div><div class="brand-title">KPIs Comer</div><div class="sub">${esc(DB.settings.company)}</div></div></div>
+      <div class="logo" title="Clic para ocultar el menú" onclick="toggleSide(true)"><img src="${IMG.peek}" alt="Ocultar menú"><div><div class="brand-title">KPIs Comer</div><div class="sub">${esc(DB.settings.company)}</div></div></div>
       <nav class="nav"><div class="sec">${roleOf(u).name}</div>${navHTML}</nav>
-      <div class="me">${avatar(u)}<div class="grow"><div class="n">${esc(u.name)}</div><div class="r">${esc(nameOf('positions', u.positionId))}</div></div><button class="iconbtn" title="Cambiar contraseña" onclick="changePasswordDlg()">${ICONS.lock}</button> <button class="iconbtn" title="Actualizar datos" onclick="sbRefresh()">${ICONS.refresh}</button> <button class="iconbtn" title="Cerrar sesión" onclick="logout()">${ICONS.logout}</button></div>
+      <div class="me">${avatar(u)}<div class="grow"><div class="n">${esc(u.name)}</div><div class="r">${esc(nameOf('positions', u.positionId))}</div></div></div><div class="me-actions"><button class="iconbtn" title="Cambiar contraseña" onclick="changePasswordDlg()">${ICONS.lock}</button><button class="iconbtn" title="Actualizar datos" onclick="sbRefresh()">${ICONS.refresh}</button><button class="logoutbtn" title="Cerrar sesión" onclick="logout()">${ICONS.logout}Cerrar sesión</button></div>
     </aside>
     <main class="main" id="main"></main>
     <div class="footerbar"><b>${esc(DB.settings.company)}</b><span>${esc(DB.settings.appName)} · <span id="sbStatus"></span> ${q ? esc(q.name) : ''}${cw ? ' · Semana ' + cw.number : ''}${DB.settings.simDate ? ' · Fecha de referencia: ' + fmtDate(DB.settings.simDate) : ''}</span></div>
@@ -1082,10 +1203,11 @@ function openAnnualCapture(userId, kpiId, year, readOnly = false) {
   const me = currentUser(); if (!isAdmin(me) && me.id !== userId && !isDir(me)) return; if (isDir(me)) readOnly = true;
   const k = computeAnnualKpi(userId, kpiId, year, { cutoff: '9999' }); const kpi = k.kpi; const last = k.last; const u = byId('users', userId);
   ANN = { userId, kpiId, year };
-  const hist = [...k.entries].reverse().map((e, i, arr) => { const prev = arr[i + 1]; const val = kpi.type === 'A' ? fmtNum(e.value) : `${fmtPct(e.value, 1)} (${fmtNum(e.numerator)}/${fmtNum(e.denominator)})`; const pv = prev ? (kpi.type === 'A' ? fmtNum(prev.value) : fmtPct(prev.value, 1)) : '—'; return `<tr><td class="small" style="white-space:nowrap">${fmtDateTime(e.ts)}</td><td>${esc(nameOf('users', e.createdBy, 'sistema'))}</td><td class="num muted small">${pv}</td><td class="num"><b>${val}</b></td><td class="small">${esc(e.comment || '')}</td></tr>`; }).join('') || '<tr><td colspan="5" class="center muted">Sin actualizaciones registradas</td></tr>';
+  const hist = [...k.entries].reverse().map((e, i, arr) => { const prev = arr[i + 1]; const val = kpi.type === 'A' ? fmtNum(e.value) : `${fmtPct(e.value, 1)} (${fmtNum(e.numerator)}/${fmtNum(e.denominator)})`; const pv = prev ? (kpi.type === 'A' ? fmtNum(prev.value) : fmtPct(prev.value, 1)) : '—'; return `<tr><td class="small" style="white-space:nowrap">${fmtDateTime(e.ts)}</td><td>${esc(nameOf('users', e.createdBy, 'sistema'))}</td><td class="num muted small">${pv}</td><td class="num"><b>${val}</b></td><td class="small">${e.detail ? `<div>${listaLines(e.detail).map(esc).join(', ')}</div>` : ''}${esc(e.comment || '')}</td></tr>`; }).join('') || '<tr><td colspan="5" class="center muted">Sin actualizaciones registradas</td></tr>';
   const form = readOnly ? '' : `<div class="capture-kpi"><div class="kh"><div><span class="t">Nueva actualización</span> <span class="small muted">· captura libre, sin periodicidad fija</span></div>${badge('b-mor', 'Anual ' + year)}</div>
-    ${kpi.type === 'A' ? `<div class="fields c3"><div class="field"><label>Avance actual acumulado (${esc(kpi.unit)})</label><input type="number" min="0" step="1" id="an_value" value="${last ? last.value : ''}"></div><div class="field"><label>Meta anual</label><input value="${fmtNum(k.meta)}" disabled></div><div class="field"><label>Valor anterior</label><input value="${last ? fmtNum(last.value) : '—'}" disabled></div></div>`
-      : `<div class="fields c3"><div class="field"><label>${esc(kpi.numeratorLabel || 'Numerador')}</label><input type="number" min="0" step="any" id="an_num" value="${last ? last.numerator : ''}"></div><div class="field"><label>${esc(kpi.denominatorLabel || 'Denominador')}</label><input type="number" min="0" step="any" id="an_den" value="${last ? last.denominator : ''}"></div><div class="field"><label>Meta anual</label><input value="${fmtPct(k.meta, 0)}${kpi.direction === 'menor' ? ' (máximo)' : ''}" disabled></div></div>`}
+    ${isListaKpi(kpi) ? `<div class="fields c3"><div class="field" style="grid-column:span 2"><label>Clientes con cambio de renta fija a variable (uno por renglón)</label><textarea id="an_list" rows="6" oninput="anListCount()" placeholder="Ej.\nWalmart\nChedraui">${esc(last && last.detail ? last.detail : '')}</textarea><div class="small muted">Cada renglón cuenta como 1 cliente. Para agregar uno nuevo escríbelo debajo de los anteriores.</div></div><div><div class="field"><label>Avance (clientes)</label><input id="an_value" value="${last ? listaLines(last.detail).length || last.value : 0}" disabled></div><div class="field"><label>Meta anual</label><input value="${fmtNum(k.meta)}" disabled></div></div></div>`
+      : kpi.type === 'A' ? `<div class="fields c3"><div class="field"><label>Avance actual acumulado (${esc(kpi.unit)})</label><input type="text" inputmode="numeric" id="an_value" value="${last ? last.value : ''}"></div><div class="field"><label>Meta anual</label><input value="${fmtNum(k.meta)}" disabled></div><div class="field"><label>Valor anterior</label><input value="${last ? fmtNum(last.value) : '—'}" disabled></div></div>`
+      : `<div class="fields c3"><div class="field"><label>${esc(kpi.numeratorLabel || 'Numerador')}</label><input type="text" inputmode="decimal" id="an_num" value="${last ? last.numerator : ''}"></div><div class="field"><label>${esc(kpi.denominatorLabel || 'Denominador')}</label><input type="text" inputmode="decimal" id="an_den" value="${last ? last.denominator : ''}"></div><div class="field"><label>Meta anual</label><input value="${fmtPct(k.meta, 0)}${kpi.direction === 'menor' ? ' (máximo)' : ''}" disabled></div></div>`}
     <div class="field"><label>Comentario de la actualización</label><input id="an_comment" placeholder="Qué cambió y por qué"></div>
     <div class="msg info">${ICONS.shield}Cada modificación queda registrada con fecha, hora y nombre de quien la realizó. El valor vigente es siempre la última actualización.</div></div>`;
   openModal(`${esc(kpi.name)} · ${year}`, `<div class="row between mb16"><div><b>${esc(u.name)}</b> · ${esc(nameOf('positions', u.positionId))}<div class="small muted">${esc(kpi.formulaDescription)}</div></div>${semBadge(k.sem)} <b style="font-size:20px;color:var(--morado-osc)">${fmtPct(k.pct)}</b></div>
@@ -1094,10 +1216,12 @@ function openAnnualCapture(userId, kpiId, year, readOnly = false) {
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fecha y hora</th><th>Modificó</th><th class="num">Anterior</th><th class="num">Nuevo</th><th>Comentario</th></tr></thead><tbody>${hist}</tbody></table></div>`,
     readOnly ? `<button class="btn ghost" onclick="closeModal()">Cerrar</button>` : `<button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn mor" onclick="submitAnnual()">${ICONS.save}Guardar actualización</button>`, { wide: true, sticky: !readOnly });
 }
+function anListCount() { const el = document.getElementById('an_list'); const out = document.getElementById('an_value'); if (el && out) out.value = listaLines(el.value).length; }
 function submitAnnual() {
   const kpi = byId('kpis', ANN.kpiId); const g = id => { const el = document.getElementById(id); return el ? el.value : ''; };
   const data = { comment: g('an_comment') };
-  if (kpi.type === 'A') { if (g('an_value') === '' || Number(g('an_value')) < 0) { toast('Captura un avance válido (≥ 0)', 'err'); return; } data.value = Number(g('an_value')); }
+  if (isListaKpi(kpi)) { const lines = listaLines(g('an_list')); data.value = lines.length; data.detail = lines.join('\n'); }
+  else if (kpi.type === 'A') { if (g('an_value') === '' || Number(g('an_value')) < 0) { toast('Captura un avance válido (≥ 0)', 'err'); return; } data.value = Number(g('an_value')); }
   else { if (g('an_num') === '' || g('an_den') === '' || Number(g('an_den')) <= 0 || Number(g('an_num')) < 0) { toast('Numerador y denominador válidos son obligatorios', 'err'); return; } data.numerator = Number(g('an_num')); data.denominator = Number(g('an_den')); }
   saveAnnualEntry(ANN.userId, ANN.kpiId, ANN.year, data); closeModal(); render(); toast('Actualización registrada en la bitácora', 'ok');
 }
@@ -1202,11 +1326,19 @@ function execDashboardHTML(u, q, cw, embedded) {
    MODAL DE CAPTURA (ejecutivo y corrección por administrador)
    ===================================================================== */
 let CAP = null; // estado de captura en edición
-function payloadFromSubmission(u, q, s) {
+function payloadFromSubmission(u, q, s, w = null) {
   const p = { __comment: s ? (s.comment || '') : '' };
   for (const t of targetsOf(u.id, q.id)) {
     const v = s ? valuesOf(s.id).find(x => x.kpiId === t.kpiId) : null;
-    p[t.kpiId] = { value: v && v.value != null && byId('kpis', t.kpiId).type === 'A' ? v.value : '', numerator: v && v.numerator != null ? v.numerator : '', denominator: v && v.denominator != null ? v.denominator : '', comment: v ? v.comment || '' : '', breakdown: v ? breakdownsOf(v.id).map(b => ({ chainId: b.chainId, quantity: b.quantity })) : [] };
+    const kpi = byId('kpis', t.kpiId);
+    // Ratio con denominador "snapshot" (p. ej. universo de tiendas a prospectar): se propone el último denominador capturado
+    let denPrev = '';
+    if (!v && w && kpi.type === 'C' && kpi.denominatorMode === 'snapshot') { const r = computeKpi(u.id, t.kpiId, q.id, w.number - 1, { includeDraft: true }); const last = [...r.series].reverse().find(x => x.raw && x.raw.denominator != null); if (last) denPrev = last.raw.denominator; }
+    if (isLocalesKpi(kpi)) { p[t.kpiId] = { value: v && v.denominator != null ? v.denominator : '', numerator: '', denominator: '', comment: v ? v.comment || '' : '', breakdown: [], items: v ? localItemsOf(v.id).map(it => ({ kind: it.kind, referenceDate: it.referenceDate, installDays: it.installDays, note: it.note || '' })) : [] }; continue; }
+    if (isConjuntoKpi(kpi)) { const fv = parseFV(v ? v.detail : ''); p[t.kpiId] = { value: '', numerator: v && v.numerator != null ? v.numerator : '', denominator: '', comment: v ? v.comment || '' : '', breakdown: [], fijas: fv.fijas, variables: fv.variables }; continue; }
+    if (isParadosKpi(kpi)) { const pend = w ? paradosPendientesPrevios(u.id, t.kpiId, q.id, w.number) : 0; const den = v && v.denominator != null ? v.denominator : ''; p[t.kpiId] = { value: '', numerator: v && v.numerator != null ? v.numerator : '', denominator: den, comment: v ? v.comment || '' : '', breakdown: [], pendPrev: pend, nuevos: den === '' ? '' : Math.max(0, Number(den) - pend) }; continue; }
+    if (isListaKpi(kpi)) { p[t.kpiId] = { value: v && v.value != null ? v.value : '0', numerator: '', denominator: '', comment: v ? v.comment || '' : '', breakdown: [], detail: v && v.detail ? v.detail : '' }; continue; }
+    p[t.kpiId] = { value: v && v.value != null && kpi.type === 'A' ? v.value : '', numerator: v && v.numerator != null ? v.numerator : '', denominator: v && v.denominator != null ? v.denominator : denPrev, comment: v ? v.comment || '' : '', breakdown: v ? breakdownsOf(v.id).map(b => ({ chainId: b.chainId, quantity: b.quantity })) : [] };
   }
   return p;
 }
@@ -1216,7 +1348,7 @@ function openCapture(userId, weekId, readOnly = false) {
   if (isDir(me)) readOnly = true;
   if (!readOnly && !canEditWeek(me, w) && !(isAdmin(me) && !w.locked)) readOnly = true;
   const s = submissionOf(userId, w.id);
-  CAP = { u, w, q, s, readOnly, payload: payloadFromSubmission(u, q, s), admin: isAdmin(me) && me.id !== userId };
+  CAP = { u, w, q, s, readOnly, payload: payloadFromSubmission(u, q, s, w), admin: isAdmin(me) && me.id !== userId };
   renderCaptureModal();
 }
 function renderCaptureModal() {
@@ -1236,27 +1368,78 @@ function renderCaptureModal() {
 }
 function captureKpiHTML(t, i, chains, val) {
   const kpi = byId('kpis', t.kpiId); const p = CAP.payload[t.kpiId]; const ro = CAP.readOnly ? 'disabled' : '';
-  const pk = val.perKpi[t.kpiId]; const has = kpi.type === 'A' ? p.value !== '' : (p.numerator !== '' && p.denominator !== '');
+  const pk = val.perKpi[t.kpiId]; const has = (kpi.type === 'A' || isLocalesKpi(kpi)) ? p.value !== '' : (p.numerator !== '' && p.denominator !== '');
   const cls = pk.complete ? 'ok' : has ? 'err' : '';
   const prev = computeKpi(t.userId, t.kpiId, t.quarterId, CAP.w.number - 1);
   let inputs = '';
-  if (kpi.type === 'A') {
-    inputs = `<div class="fields c3"><div class="field"><label>Cantidad realizada esta semana (${esc(kpi.unit)})</label><input type="number" min="0" step="1" ${ro} value="${p.value}" oninput="capSet('${t.kpiId}','value',this.value)"></div>
+  if (isLocalesKpi(kpi)) {
+    const n = Number(p.value) || 0; const items = p.items || []; const fast = items.filter(it => it.installDays !== '' && it.installDays != null && localItemFast(it)).length;
+    const prevNum = prev.series.reduce((a, x) => a + (x.raw && x.raw.numerator != null ? Number(x.raw.numerator) : 0), 0), prevDen = prev.series.reduce((a, x) => a + (x.raw && x.raw.denominator != null ? Number(x.raw.denominator) : 0), 0);
+    const accN = prevNum + fast, accD = prevDen + n;
+    inputs = `<div class="fields c3"><div class="field"><label>¿Cuántos locales instalaste esta semana?</label><input type="text" inputmode="numeric" ${ro} value="${p.value}" oninput="capLocN('${t.kpiId}',this.value)"></div>
+      <div class="field"><label>Instalados en 30 días o menos (esta semana)</label><input value="${p.value === '' ? '—' : fast + ' de ' + n}" disabled></div>
+      <div class="field"><label>Acumulado del trimestre</label><input value="${accD > 0 ? accN + ' de ' + accD + ' → ' + fmtPct(accN / accD * 100, 1) + ' · meta ' + fmtPct(t.target, 0) : '—'}" disabled></div></div>
+      ${items.length ? `<div class="breakdown"><h4>Detalle por local</h4>
+      ${items.map((it, j) => { const k = LOCAL_KINDS[it.kind]; const ok = it.installDays !== '' && it.installDays != null; const d = Number(it.installDays); return `<div class="loc-row ${ok ? (d <= 30 ? 'fast' : 'slow') : ''}"><div class="loc-head"><b>Local ${j + 1}</b>${ok ? (d <= 30 ? badge('b-verde', '≤ 30 días', 'check') : badge('b-rojo', '> 30 días', 'alert')) : badge('b-amar', 'Incompleto', 'alert')}</div>
+        <div class="fields c3"><div class="field"><label>Tipo de local</label><select ${ro} onchange="capLoc('${t.kpiId}',${j},'kind',this.value)"><option value="">— Elige —</option><option value="nuevo" ${it.kind === 'nuevo' ? 'selected' : ''}>Nuevo</option><option value="reacondicionado" ${it.kind === 'reacondicionado' ? 'selected' : ''}>Reacondicionado</option></select></div>
+        <div class="field"><label>${esc(k ? k.dateLabel : 'Fecha de referencia (elige primero el tipo)')}</label><input type="date" ${ro} ${k ? '' : 'disabled'} value="${esc(it.referenceDate || '')}" onchange="capLoc('${t.kpiId}',${j},'referenceDate',this.value)"></div>
+        <div class="field"><label>Días que tardó en instalarse</label><input type="text" inputmode="numeric" ${ro} value="${it.installDays ?? ''}" oninput="capLoc('${t.kpiId}',${j},'installDays',this.value)"></div></div></div>`; }).join('')}
+      </div>` : ''}
+      <div class="note">${esc(kpi.formulaDescription)}</div>`;
+  } else if (kpi.type === 'A') {
+    inputs = isListaKpi(kpi) ? `<div class="fields c3"><div class="field" style="grid-column:span 2"><label>${esc(kpi.numeratorLabel || 'Nombres (uno por renglón)')}</label><textarea rows="5" ${ro} oninput="capLista('${t.kpiId}',this.value)" placeholder="Escribe un nombre por renglón; cada renglón cuenta 1">${esc(p.detail || '')}</textarea><div class="small muted">Sin límite de renglones; cada nombre cuenta 1.</div></div>
+      <div><div class="field"><label>Esta semana (${esc(kpi.unit)})</label><input value="${fmtNum(listaLines(p.detail).length)}" disabled></div><div class="field"><label>Acumulado con esta semana</label><input value="${fmtNum((prev.current || 0) + listaLines(p.detail).length)} de ${fmtNum(t.target)} → ${fmtPct(((prev.current || 0) + listaLines(p.detail).length) / t.target * 100)}" disabled></div></div></div>`
+    : `<div class="fields c3"><div class="field"><label>Cantidad realizada esta semana (${esc(kpi.unit)})</label><input type="text" inputmode="numeric" ${ro} value="${p.value}" oninput="capSet('${t.kpiId}','value',this.value)"></div>
       <div class="field"><label>Acumulado previo</label><input value="${fmtNum(prev.current || 0)}" disabled></div>
       <div class="field"><label>Acumulado con esta semana</label><input value="${fmtNum((prev.current || 0) + (Number(p.value) || 0))} de ${fmtNum(t.target)} → ${fmtPct(((prev.current || 0) + (Number(p.value) || 0)) / t.target * 100)}" disabled></div></div>`;
   } else {
     const ratio = p.denominator > 0 ? Number(p.numerator) / Number(p.denominator) * 100 : null;
-    inputs = `<div class="fields c3"><div class="field"><label>${esc(kpi.numeratorLabel || 'Numerador')}</label><input type="number" min="0" step="any" ${ro} value="${p.numerator}" oninput="capSet('${t.kpiId}','numerator',this.value)"></div>
-      <div class="field"><label>${esc(kpi.denominatorLabel || 'Denominador')}</label><input type="number" min="0" step="any" ${ro} value="${p.denominator}" oninput="capSet('${t.kpiId}','denominator',this.value)"></div>
-      <div class="field"><label>Resultado de la semana</label><input value="${ratio == null ? '—' : fmtPct(ratio, 2) + ' · meta ' + fmtPct(t.target, 0)}" disabled></div></div>
+    if (isConjuntoKpi(kpi)) {
+      const g = rentasGlobalTrimestre(t.quarterId); const f = Number(p.fijas) || 0, va = Number(p.variables) || 0;
+      const teamPrev = prev.series.length ? (prev.series[prev.series.length - 1].teamNum || 0) : 0;
+      // lo ya enviado por el equipo hasta la semana anterior + lo que llevan los demás esta semana + lo mío
+      let othersWeek = 0; for (const x of DB.user_kpi_targets.filter(x => x.kpiId === t.kpiId && x.quarterId === t.quarterId && x.active !== false && x.userId !== t.userId)) { const s2 = submissionOf(x.userId, CAP.w.id); if (!s2 || !COUNTED.includes(s2.status)) continue; const v2 = valuesOf(s2.id).find(y => y.kpiId === t.kpiId); if (v2) othersWeek += Number(v2.numerator) || 0; }
+      const teamNow = teamPrev + othersWeek + f + va;
+      inputs = `<div class="fields c3"><div class="field"><label>Rentas FIJAS pagadas esta semana</label><input type="text" inputmode="numeric" ${ro} value="${p.fijas}" oninput="capSet('${t.kpiId}','fijas',this.value)"></div>
+        <div class="field"><label>Rentas VARIABLES pagadas esta semana</label><input type="text" inputmode="numeric" ${ro} value="${p.variables}" oninput="capSet('${t.kpiId}','variables',this.value)"></div>
+        <div class="field"><label>Total de rentas de la semana</label><input value="${fmtNum(f + va)}" disabled></div></div>
+        <div class="fields c3"><div class="field"><label>Rentas por pagar en el trimestre (global IC)</label><input value="${fmtNum(g.trimestre)} = (${fmtNum(g.fijas)} fijas + ${fmtNum(g.variables)} variables) × ${g.meses} meses" disabled></div>
+        <div class="field" style="grid-column:span 2"><label>Acumulado conjunto del equipo con esta semana</label><input value="${g.trimestre > 0 ? fmtNum(teamNow) + ' de ' + fmtNum(g.trimestre) + ' → ' + fmtPct(teamNow / g.trimestre * 100, 2) + ' · meta ' + fmtPct(t.target, 0) : 'Falta configurar las rentas por mes en Parámetros'}" disabled></div></div>
+        <div class="note">${esc(kpi.formulaDescription)}</div>`;
+    } else if (isParadosKpi(kpi)) {
+      const pend = Number(p.pendPrev) || 0; const hasPrev = prev.series.some(x => x.raw && x.raw.denominator != null);
+      const den = Number(p.denominator) || 0, res = Number(p.numerator) || 0; const quedan = Math.max(0, den - res);
+      const resPrevAc = prev.series.filter(x => x.raw).reduce((a, x) => a + (Number(x.raw.numerator) || 0), 0); const totalAc = den + resPrevAc; const resAc = resPrevAc + res;
+      inputs = (hasPrev ? `<div class="fields c3"><div class="field"><label>Pendientes de la semana anterior</label><input value="${fmtNum(pend)}" disabled></div>
+        <div class="field"><label>Equipos parados NUEVOS esta semana</label><input type="text" inputmode="numeric" ${ro} value="${p.nuevos}" oninput="capParados('${t.kpiId}','nuevos',this.value)"></div>
+        <div class="field"><label>¿Cuántos tenían? (pendientes + nuevos)</label><input value="${p.denominator === '' ? '—' : fmtNum(den)}" disabled></div></div>`
+        : `<div class="fields c3"><div class="field" style="grid-column:span 3"><label>¿Cuántos equipos parados tenían? (primera semana del periodo)</label><input type="text" inputmode="numeric" ${ro} value="${p.denominator}" oninput="capParados('${t.kpiId}','denominator',this.value)"></div></div>`) +
+        `<div class="fields c3"><div class="field"><label>¿Cuántos resolvieron esta semana?</label><input type="text" inputmode="numeric" ${ro} value="${p.numerator}" oninput="capParados('${t.kpiId}','numerator',this.value)"></div>
+        <div class="field"><label>Quedan pendientes (pasan a la siguiente semana)</label><input value="${p.denominator === '' ? '—' : fmtNum(quedan)}" disabled></div>
+        <div class="field"><label>Acumulado del trimestre con esta semana</label><input value="${totalAc > 0 ? fmtNum(resAc) + ' resueltos de ' + fmtNum(totalAc) + ' → ' + fmtPct(resAc / totalAc * 100, 2) + ' · meta ' + fmtPct(t.target, 0) : '—'}" disabled></div></div>
+        <div class="note">${esc(kpi.formulaDescription)}</div>`;
+    } else {
+    const fNum = `<div class="field"><label>${esc(kpi.numeratorLabel || 'Numerador')}</label><input type="text" inputmode="decimal" ${ro} value="${p.numerator}" oninput="capSet('${t.kpiId}','numerator',this.value)"></div>`;
+    const fDen = `<div class="field"><label>${esc(kpi.denominatorLabel || 'Denominador')}</label><input type="text" inputmode="decimal" ${ro} value="${p.denominator}" oninput="capSet('${t.kpiId}','denominator',this.value)"></div>`;
+    let resLabel = 'Resultado de la semana', resVal = ratio == null ? '—' : fmtPct(ratio, 2) + ' · meta ' + fmtPct(t.target, 0);
+    if (kpi.type === 'C') {
+      const raws = prev.series.filter(x => x.raw).map(x => x.raw);
+      const numAc = raws.reduce((a, r) => a + (Number(r.numerator) || 0), 0) + (Number(p.numerator) || 0);
+      const denAc = kpi.denominatorMode === 'acumulado' ? raws.reduce((a, r) => a + (Number(r.denominator) || 0), 0) + (Number(p.denominator) || 0) : (Number(p.denominator) || 0);
+      const numUse = kpi.numeratorMode === 'snapshot' ? (Number(p.numerator) || 0) : numAc;
+      resLabel = 'Acumulado del trimestre con esta semana'; resVal = denAc > 0 ? `${fmtNum(numUse)} de ${fmtNum(denAc)} → ${fmtPct(numUse / denAc * 100, 2)} · meta ${fmtPct(t.target, 0)}` : '—';
+    }
+    inputs = `<div class="fields c3">${isConteoKpi(kpi) ? fDen + fNum : fNum + fDen}
+      <div class="field"><label>${resLabel}</label><input value="${resVal}" disabled></div></div>
       ${kpi.type === 'C' ? `<div class="note">${esc(kpi.formulaDescription)}</div>` : ''}`;
+    }
   }
   let bd = '';
   if (requiresBreakdown(kpi, t) && kpi.type === 'A') {
     const total = Number(p.value) || 0; const sum = p.breakdown.reduce((a, b) => a + (Number(b.quantity) || 0), 0); const diff = total - sum;
     const used = new Set(p.breakdown.map(b => b.chainId));
     bd = `<div class="breakdown"><h4>Detalle por cadena</h4>
-      ${p.breakdown.map((b, j) => `<div class="bd-row"><select ${ro} onchange="capBd('${t.kpiId}',${j},'chainId',this.value)"><option value="">— Selecciona cadena —</option>${chains.map(c => `<option value="${c.id}" ${b.chainId === c.id ? 'selected' : ''} ${used.has(c.id) && b.chainId !== c.id ? 'disabled' : ''}>${esc(c.name)}</option>`).join('')}</select><input type="number" min="0" step="1" ${ro} value="${b.quantity}" oninput="capBd('${t.kpiId}',${j},'quantity',this.value)">${CAP.readOnly ? '<span></span>' : `<button class="iconbtn" title="Quitar" onclick="capBdRemove('${t.kpiId}',${j})">${ICONS.trash}</button>`}</div>`).join('')}
+      ${p.breakdown.map((b, j) => `<div class="bd-row"><select ${ro} onchange="capBd('${t.kpiId}',${j},'chainId',this.value)"><option value="">— Selecciona cadena —</option>${chains.map(c => `<option value="${c.id}" ${b.chainId === c.id ? 'selected' : ''} ${used.has(c.id) && b.chainId !== c.id ? 'disabled' : ''}>${esc(c.name)}</option>`).join('')}</select><input type="text" inputmode="numeric" ${ro} value="${b.quantity}" oninput="capBd('${t.kpiId}',${j},'quantity',this.value)">${CAP.readOnly ? '<span></span>' : `<button class="iconbtn" title="Quitar" onclick="capBdRemove('${t.kpiId}',${j})">${ICONS.trash}</button>`}</div>`).join('')}
       ${CAP.readOnly ? '' : `<div class="row mt8"><button class="btn ghost sm" onclick="capBdAdd('${t.kpiId}')" ${used.size >= chains.length ? 'disabled' : ''}>${ICONS.plus}Agregar cadena</button><button class="btn ghost sm" onclick="requestChainDlg()">${ICONS.store}Solicitar nueva cadena</button></div>`}
       <div class="bd-total"><div class="stat"><span class="l">Total reportado</span><span class="v">${fmtNum(total)}</span></div><div class="stat"><span class="l">Total distribuido</span><span class="v">${fmtNum(sum)}</span></div><div class="stat"><span class="l">Diferencia</span><span class="v" style="color:${diff === 0 ? 'var(--verde)' : 'var(--rojo)'}">${diff === 0 ? '0 ✓' : (diff > 0 ? '+' : '') + fmtNum(diff)}</span></div></div>
       ${diff > 0 ? `<div class="msg err">${ICONS.alert}Existen ${fmtNum(diff)} ${esc(kpi.unit)} pendientes de asignar a una cadena.</div>` : diff < 0 ? `<div class="msg err">${ICONS.alert}El desglose por cadena excede en ${fmtNum(-diff)} ${esc(kpi.unit)} el avance reportado.</div>` : total > 0 ? `<div class="msg ok">${ICONS.check}Desglose completo: Total KPI = Total cadenas.</div>` : ''}
@@ -1280,12 +1463,24 @@ function capRefresh() {
   const sm = document.getElementById('capSummary'); if (sm) sm.innerHTML = captureSummaryHTML(val, ts);
   const btn = document.getElementById('btnEnviar'); if (btn) btn.disabled = !val.ok;
 }
-function captureFocus(el) { const a = document.activeElement; if (!a || !el.contains(a)) return null; const inputs = [...el.querySelectorAll('input,select,textarea')]; return { idx: inputs.indexOf(a), pos: a.selectionStart }; }
-function restoreFocus(id, info) { if (!info || info.idx < 0) return; const el = document.getElementById(id); const inputs = [...el.querySelectorAll('input,select,textarea')]; const t = inputs[info.idx]; if (t) { t.focus(); try { if (info.pos != null && t.type !== 'number') t.setSelectionRange(info.pos, info.pos); } catch (e) { } } }
-function capSet(kpiId, field, v) { CAP.payload[kpiId][field] = v; capRefresh(); }
-function capBd(kpiId, j, field, v) { CAP.payload[kpiId].breakdown[j][field] = field === 'quantity' ? v : v; capRefresh(); }
+function captureFocus(el) { const a = document.activeElement; if (!a || !el.contains(a)) return null; const inputs = [...el.querySelectorAll('input,select,textarea')]; let pos = null; try { pos = a.selectionStart; } catch (e) { } return { idx: inputs.indexOf(a), pos }; }
+function restoreFocus(id, info) {
+  if (!info || info.idx < 0) return; const el = document.getElementById(id); const inputs = [...el.querySelectorAll('input,select,textarea')]; const t = inputs[info.idx]; if (!t) return;
+  t.focus();
+  // Al re-dibujar el bloque el navegador deja el cursor al inicio (teclear "15" daba "51"): se recoloca donde estaba.
+  try { if (t.setSelectionRange && t.tagName !== 'SELECT' && t.type !== 'date') { const pos = Math.min(info.pos != null ? info.pos : t.value.length, t.value.length); t.setSelectionRange(pos, pos); } } catch (e) { }
+}
+/* Los campos numéricos son de texto (para conservar el cursor): se limpian caracteres no numéricos */
+function numClean(v) { return v == null ? '' : String(v).replace(',', '.').replace(/[^0-9.\-]/g, ''); }
+function capLista(kpiId, txt) { const p = CAP.payload[kpiId]; p.detail = txt; p.value = String(listaLines(txt).length); capRefresh(); }
+function capParados(kpiId, field, v) { const p = CAP.payload[kpiId]; v = numClean(v); if (field === 'nuevos') { p.nuevos = v; p.denominator = v === '' ? '' : String((Number(p.pendPrev) || 0) + (Number(v) || 0)); } else p[field] = v; capRefresh(); }
+function capSet(kpiId, field, v) { CAP.payload[kpiId][field] = field === 'comment' ? v : numClean(v); capRefresh(); }
+function capBd(kpiId, j, field, v) { CAP.payload[kpiId].breakdown[j][field] = field === 'quantity' ? numClean(v) : v; capRefresh(); }
 function capBdAdd(kpiId) { CAP.payload[kpiId].breakdown.push({ chainId: '', quantity: '' }); capRefresh(); }
 function capBdRemove(kpiId, j) { CAP.payload[kpiId].breakdown.splice(j, 1); capRefresh(); }
+/* KPI Locales: el número de locales genera un renglón por cada uno */
+function capLocN(kpiId, v) { v = numClean(v); const p = CAP.payload[kpiId]; p.value = v; const n = Math.max(0, Math.min(200, Math.floor(Number(v) || 0))); p.items = p.items || []; while (p.items.length < n) p.items.push({ kind: '', referenceDate: '', installDays: '', note: '' }); if (p.items.length > n) p.items.length = n; capRefresh(); }
+function capLoc(kpiId, j, field, v) { CAP.payload[kpiId].items[j][field] = field === 'installDays' ? numClean(v) : v; capRefresh(); }
 function submitCapture(mode) {
   const val = validateCapture(CAP.u, CAP.w, CAP.payload, mode);
   if (!val.ok) { toast(val.errors[0], 'err'); capRefresh(); return; }
@@ -1514,9 +1709,9 @@ function historicoHTML(u, q, cw) {
   const annRows = DB.annual_kpi_entries.filter(e => d.users.find(u => u.id === e.userId) && (!BI.kpiId || e.kpiId === BI.kpiId)).sort((a, b) => b.ts.localeCompare(a.ts));
   return topbar('Histórico', 'Base completa de capturas por semana, ejecutivo y KPI, con acumulado a la fecha y desglose por cadena; más la bitácora de KPIs anuales.', biChips()) + biFiltersHTML() +
     `<div class="row between mb8"><span class="small muted">${rows.length} registros</span><button class="btn sec sm" onclick="exportWorkbook(buildExportSheets(BI.qid),'KPIs_${byId('quarters', BI.qid).code.replace(/\s/g, '_')}.xlsx')">${ICONS.download}Exportar a Excel</button></div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Semana</th><th>Ejecutivo</th><th>KPI</th><th class="num">Valor semana</th><th class="num">Num / Den</th><th class="num">Acumulado</th><th class="num">% Cumpl.</th><th>Semáforo</th><th>Desglose por cadena</th><th>Estado</th></tr></thead><tbody>${rows.map(r => `<tr><td><b>S${r.w.number}</b> <span class="small muted">${fmtRange(r.w.startDate, r.w.endDate)}</span></td><td>${esc(r.us.name)}</td><td>${esc(r.kpi.name)}</td><td class="num"><b>${r.kpi.type === 'A' ? fmtNum(r.v.value) : fmtPct(r.v.value)}</b></td><td class="num small">${r.v.numerator != null ? fmtNum(r.v.numerator) + ' / ' + fmtNum(r.v.denominator) : '—'}</td><td class="num">${kpiValueText(r.k)}</td><td class="num">${fmtPct(r.k.pct)}</td><td>${semCell(r.k.sem)}</td><td class="small">${r.bds.map(b => `<span class="badge b-azul">${esc(nameOf('chains', b.chainId))} ${fmtNum(b.quantity)}</span>`).join(' ') || '—'}</td><td>${stateBadge(weekState(r.us.id, r.w))}</td></tr>`).join('') || '<tr><td colspan="10" class="center muted">Sin registros</td></tr>'}</tbody></table></div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Semana</th><th>Ejecutivo</th><th>KPI</th><th class="num">Valor semana</th><th class="num">Num / Den</th><th class="num">Acumulado</th><th class="num">% Cumpl.</th><th>Semáforo</th><th>Desglose por cadena</th><th>Estado</th></tr></thead><tbody>${rows.map(r => `<tr><td><b>S${r.w.number}</b> <span class="small muted">${fmtRange(r.w.startDate, r.w.endDate)}</span></td><td>${esc(r.us.name)}</td><td>${esc(r.kpi.name)}</td><td class="num"><b>${r.kpi.type === 'A' ? fmtNum(r.v.value) : fmtPct(r.v.value)}</b></td><td class="num small">${r.v.numerator != null ? fmtNum(r.v.numerator) + ' / ' + fmtNum(r.v.denominator) : '—'}</td><td class="num">${kpiValueText(r.k)}</td><td class="num">${fmtPct(r.k.pct)}</td><td>${semCell(r.k.sem)}</td><td class="small">${r.v.detail ? listaLines(r.v.detail).map(esc).join(', ') : (r.bds.map(b => `<span class="badge b-azul">${esc(nameOf('chains', b.chainId))} ${fmtNum(b.quantity)}</span>`).join(' ') || '—')}</td><td>${stateBadge(weekState(r.us.id, r.w))}</td></tr>`).join('') || '<tr><td colspan="10" class="center muted">Sin registros</td></tr>'}</tbody></table></div>
     <div class="tbl-title mt24"><h3>Bitácora de KPIs anuales</h3><span class="small muted">${annRows.length} actualizaciones</span></div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fecha y hora</th><th>Ejecutivo</th><th>KPI</th><th class="num">Valor</th><th class="num">Num / Den</th><th>Comentario</th><th>Modificó</th></tr></thead><tbody>${annRows.map(e => { const kpi = byId('kpis', e.kpiId); return `<tr><td class="small" style="white-space:nowrap">${fmtDateTime(e.ts)}</td><td>${esc(nameOf('users', e.userId))}</td><td>${esc(kpi.name)} <span class="badge b-mor">${e.year}</span></td><td class="num"><b>${kpi.type === 'A' ? fmtNum(e.value) : fmtPct(e.value)}</b></td><td class="num small">${e.numerator != null ? fmtNum(e.numerator) + ' / ' + fmtNum(e.denominator) : '—'}</td><td class="small">${esc(e.comment || '')}</td><td class="small">${esc(nameOf('users', e.createdBy, 'sistema'))}</td></tr>`; }).join('') || '<tr><td colspan="7" class="center muted">Sin registros</td></tr>'}</tbody></table></div>`;
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fecha y hora</th><th>Ejecutivo</th><th>KPI</th><th class="num">Valor</th><th class="num">Num / Den</th><th>Comentario</th><th>Modificó</th></tr></thead><tbody>${annRows.map(e => { const kpi = byId('kpis', e.kpiId); return `<tr><td class="small" style="white-space:nowrap">${fmtDateTime(e.ts)}</td><td>${esc(nameOf('users', e.userId))}</td><td>${esc(kpi.name)} <span class="badge b-mor">${e.year}</span></td><td class="num"><b>${kpi.type === 'A' ? fmtNum(e.value) : fmtPct(e.value)}</b></td><td class="num small">${e.numerator != null ? fmtNum(e.numerator) + ' / ' + fmtNum(e.denominator) : '—'}</td><td class="small">${e.detail ? listaLines(e.detail).map(esc).join(', ') + ' · ' : ''}${esc(e.comment || '')}</td><td class="small">${esc(nameOf('users', e.createdBy, 'sistema'))}</td></tr>`; }).join('') || '<tr><td colspan="7" class="center muted">Sin registros</td></tr>'}</tbody></table></div>`;
 }
 VIEWS['DIRECTIVO:historico'] = historicoHTML;
 
@@ -1571,18 +1766,18 @@ VIEWS['ADMIN:kpis'] = (u, q) => {
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>KPI</th><th>Tipo</th><th>Unidad</th><th>Fórmula</th><th>Desglose por cadena</th><th>Dirección</th><th class="num">Asignado a</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
 };
 function kpiDlg(id) {
-  const k = id ? byId('kpis', id) : { code: '', name: '', type: 'A', unit: 'equipos', centralActivity: '', formulaDescription: '', requiresChainBreakdown: true, direction: 'mayor', numeratorLabel: '', denominatorLabel: '', numeratorMode: 'acumulado', denominatorMode: 'snapshot' };
+  const k = id ? byId('kpis', id) : { code: '', name: '', type: 'A', unit: 'equipos', centralActivity: '', formulaDescription: '', requiresChainBreakdown: true, direction: 'mayor', numeratorLabel: '', denominatorLabel: '', numeratorMode: 'acumulado', denominatorMode: 'snapshot', captureMode: 'normal' };
   openModal(id ? 'Editar KPI' : 'Nuevo KPI', `<div class="fields">${formField('Código', `<input id="k_code" value="${esc(k.code)}">`)}${formField('Nombre', `<input id="k_name" value="${esc(k.name)}">`)}
     ${formField('Periodicidad', `<select id="k_per"><option value="trimestral" ${k.periodicity !== 'anual' ? 'selected' : ''}>Trimestral · captura semanal</option><option value="anual" ${k.periodicity === 'anual' ? 'selected' : ''}>Anual · captura libre con bitácora</option></select>`)}${formField('Tipo de cálculo', `<select id="k_type" onchange="kpiTypeUI()"><option value="A" ${k.type === 'A' ? 'selected' : ''}>A · Cantidad acumulativa</option><option value="B" ${k.type === 'B' ? 'selected' : ''}>B · Porcentaje / snapshot</option><option value="C" ${k.type === 'C' ? 'selected' : ''}>C · Ratio contra objetivo</option></select>`)}${formField('Unidad', `<input id="k_unit" value="${esc(k.unit)}">`)}
     ${formField('Actividad central', `<input id="k_act" value="${esc(k.centralActivity || '')}">`)}${formField('Dirección', `<select id="k_dir"><option value="mayor" ${k.direction !== 'menor' ? 'selected' : ''}>Mayor es mejor</option><option value="menor" ${k.direction === 'menor' ? 'selected' : ''}>Menor es mejor (invierte el cumplimiento)</option></select>`)}</div>
     ${formField('Descripción de la fórmula', `<textarea id="k_form" rows="2">${esc(k.formulaDescription || '')}</textarea>`)}
-    <div id="k_ratio" class="fields ${k.type === 'A' ? 'hidden' : ''}">${formField('Etiqueta del numerador', `<input id="k_numl" value="${esc(k.numeratorLabel || '')}">`)}${formField('Etiqueta del denominador', `<input id="k_denl" value="${esc(k.denominatorLabel || '')}">`)}${formField('Numerador', `<select id="k_numm"><option value="acumulado" ${k.numeratorMode !== 'snapshot' ? 'selected' : ''}>Acumulado en el trimestre</option><option value="snapshot" ${k.numeratorMode === 'snapshot' ? 'selected' : ''}>Snapshot de la semana</option></select>`)}${formField('Denominador', `<select id="k_denm"><option value="snapshot" ${k.denominatorMode !== 'acumulado' ? 'selected' : ''}>Snapshot de la semana</option><option value="acumulado" ${k.denominatorMode === 'acumulado' ? 'selected' : ''}>Acumulado en el trimestre</option></select>`)}</div>
+    <div id="k_ratio" class="fields ${k.type === 'A' ? 'hidden' : ''}">${formField('Etiqueta del numerador', `<input id="k_numl" value="${esc(k.numeratorLabel || '')}">`)}${formField('Etiqueta del denominador', `<input id="k_denl" value="${esc(k.denominatorLabel || '')}">`)}${formField('Modo de captura', `<select id="k_capm"><option value="normal" ${!['locales','lista','conjunto','parados'].includes(k.captureMode) ? 'selected' : ''}>Normal (cantidad o numerador y denominador)</option><option value="lista" ${k.captureMode === 'lista' ? 'selected' : ''}>Lista de nombres: se escriben uno por renglón y cada uno cuenta 1 (semanal o anual)</option><option value="conjunto" ${k.captureMode === 'conjunto' ? 'selected' : ''}>Rentas pagadas (conjunto): fijas + variables de cada quien vs. el global del trimestre de Parámetros</option><option value="parados" ${k.captureMode === 'parados' ? 'selected' : ''}>Equipos parados: pendientes anteriores + nuevos = tenían; resueltos; el resto pasa a la siguiente semana</option><option value="locales" ${k.captureMode === 'locales' ? 'selected' : ''}>Locales: un renglón por local (nuevo / reacondicionado, fecha, días)</option></select>`)}${formField('Numerador', `<select id="k_numm"><option value="acumulado" ${k.numeratorMode !== 'snapshot' ? 'selected' : ''}>Acumulado en el trimestre</option><option value="snapshot" ${k.numeratorMode === 'snapshot' ? 'selected' : ''}>Snapshot de la semana</option></select>`)}${formField('Denominador', `<select id="k_denm"><option value="snapshot" ${k.denominatorMode !== 'acumulado' ? 'selected' : ''}>Snapshot de la semana</option><option value="acumulado" ${k.denominatorMode === 'acumulado' ? 'selected' : ''}>Acumulado en el trimestre</option></select>`)}</div>
     <div id="k_bdwrap" class="${k.type !== 'A' ? 'hidden' : ''}"><label class="switch"><input type="checkbox" id="k_bd" ${k.requiresChainBreakdown ? 'checked' : ''}> Requiere desglose por cadena (la suma del detalle debe igualar el total reportado)</label></div>`,
     `<button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" onclick="saveKpi('${id || ''}')">${ICONS.save}Guardar</button>`);
 }
 function kpiTypeUI() { const t = $v('k_type'); document.getElementById('k_ratio').classList.toggle('hidden', t === 'A'); document.getElementById('k_bdwrap').classList.toggle('hidden', t !== 'A'); }
 function saveKpi(id) {
-  const data = { code: $v('k_code').trim(), name: $v('k_name').trim(), type: $v('k_type'), periodicity: $v('k_per'), unit: $v('k_unit').trim(), centralActivity: $v('k_act').trim(), direction: $v('k_dir'), formulaDescription: $v('k_form').trim(), numeratorLabel: $v('k_numl'), denominatorLabel: $v('k_denl'), numeratorMode: $v('k_numm'), denominatorMode: $v('k_denm'), requiresChainBreakdown: $v('k_type') === 'A' ? $v('k_bd') : false };
+  const data = { code: $v('k_code').trim(), name: $v('k_name').trim(), type: $v('k_type'), periodicity: $v('k_per'), unit: $v('k_unit').trim(), centralActivity: $v('k_act').trim(), direction: $v('k_dir'), formulaDescription: $v('k_form').trim(), numeratorLabel: $v('k_numl'), denominatorLabel: $v('k_denl'), numeratorMode: $v('k_numm'), denominatorMode: $v('k_denm'), captureMode: ($v('k_type') !== 'A' && $v('k_capm') === 'locales') ? 'locales' : 'normal', requiresChainBreakdown: $v('k_type') === 'A' ? $v('k_bd') : false };
   if (!data.name || !data.code) { toast('Código y nombre son obligatorios', 'err'); return; }
   if (id) { const k = byId('kpis', id); for (const f in data) if (k[f] !== data[f]) { audit('kpis', id, 'editar', f, k[f], data[f]); k[f] = data[f]; } }
   else { const k = { id: uid('k'), ...data, active: true }; DB.kpis.push(k); audit('kpis', k.id, 'crear', 'name', null, k.name); }
@@ -1751,6 +1946,7 @@ VIEWS['ADMIN:parametros'] = (u, q) => {
       <div class="card acc-m"><h3>Generación de semanas (valores default para nuevos periodos)</h3><div class="fields">${formField('Semana de seguimiento', `<select id="p_mode"><option value="lun-vie" ${s.weekMode === 'lun-vie' ? 'selected' : ''}>Lunes a viernes</option><option value="lun-dom" ${s.weekMode === 'lun-dom' ? 'selected' : ''}>Lunes a domingo</option></select>`)}${formField('Semanas parciales', `<select id="p_partial"><option value="incluir" ${s.partialWeeks === 'incluir' ? 'selected' : ''}>Incluir</option><option value="excluir" ${s.partialWeeks === 'excluir' ? 'selected' : ''}>Excluir</option></select>`)}</div></div>
       <div class="card acc-c"><h3>Textos</h3>${formField('Nombre de la aplicación', `<input id="p_app" value="${esc(s.appName)}">`)}${formField('Empresa / área (pie de página)', `<input id="p_company" value="${esc(s.company)}">`)}${formField('Texto del recordatorio', `<input id="p_rem" value="${esc(s.reminderText)}">`)}</div>
       <div class="card acc-g"><h3>Tarjetas del dashboard directivo</h3><p class="small muted">Las tarjetas fijas son Avance comercial general, Instalaciones y Clientes nuevos. Elige los 3 KPIs (trimestrales o anuales) de las tarjetas configurables.</p>${[0, 1, 2].map(i => formField('Tarjeta ' + (i + 4), `<select id="p_tile${i}">${DB.kpis.filter(k => k.active).map(k => `<option value="${k.id}" ${(s.dashboardTiles || [])[i] === k.id ? 'selected' : ''}>${esc(k.name)}${k.periodicity === 'anual' ? ' (anual)' : ''}</option>`).join('')}</select>`)).join('')}</div>
+      <div class="card acc-v"><h3>Rentas por pagar (dato global de Inteligencia Comercial)</h3><p class="small muted">Rentas que debe pagar toda la compañía cada mes. El KPI "Rentas Pagadas" compara la suma de lo que capturan todos los ejecutivos contra este total × los meses del trimestre.</p><div class="fields">${formField('Rentas FIJAS al mes (incluye bodegas)', `<input id="p_rfij" type="number" min="0" value="${s.rentasMesFijas ?? 0}">`)}${formField('Rentas VARIABLES al mes', `<input id="p_rvar" type="number" min="0" value="${s.rentasMesVariables ?? 0}">`)}</div><div class="small muted">Total al mes: <b>${fmtNum((Number(s.rentasMesFijas) || 0) + (Number(s.rentasMesVariables) || 0))}</b> · Trimestre (× ${q ? monthsOfQuarter(q.id).length : 3} meses): <b>${fmtNum(((Number(s.rentasMesFijas) || 0) + (Number(s.rentasMesVariables) || 0)) * (q ? monthsOfQuarter(q.id).length : 3))}</b></div></div>
       <div class="card acc-o"><h3>Fecha de referencia (opcional)</h3><p class="small muted">Define qué semana se considera "actual". Déjala vacía para usar la fecha real del equipo (hoy: ${fmtDate(todayISO())}). Útil para probar el flujo de semanas.</p>${formField('Fecha de referencia', `<input id="p_sim" type="date" value="${s.simDate || ''}">`)}<button class="btn ghost sm" onclick="document.getElementById('p_sim').value=''">Usar fecha real</button></div>
     </div>
     <div class="row mt16"><button class="btn" onclick="saveSettings()">${ICONS.save}Guardar parámetros</button><button class="btn sec" onclick="exportWorkbook(buildExportSheets('${q.id}'),'KPIs_${esc(q.code).replace(/\s/g, '_')}.xlsx')">${ICONS.download}Exportar periodo actual a Excel</button><button class="btn ghost" onclick="exportJSON()">${ICONS.download}Descargar copia (JSON)</button></div>
@@ -1758,7 +1954,7 @@ VIEWS['ADMIN:parametros'] = (u, q) => {
 };
 function saveSettings() {
   const g = Number($v('p_green')), y = Number($v('p_yellow')); if (!(y < g)) { toast('El umbral amarillo debe ser menor que el verde', 'err'); return; }
-  const n = { defaultGreen: g, defaultYellow: y, weekMode: $v('p_mode'), partialWeeks: $v('p_partial'), appName: $v('p_app').trim(), company: $v('p_company').trim(), reminderText: $v('p_rem').trim(), simDate: $v('p_sim') || null, dashboardTiles: [$v('p_tile0'), $v('p_tile1'), $v('p_tile2')] };
+  const n = { defaultGreen: g, defaultYellow: y, weekMode: $v('p_mode'), partialWeeks: $v('p_partial'), appName: $v('p_app').trim(), company: $v('p_company').trim(), reminderText: $v('p_rem').trim(), simDate: $v('p_sim') || null, dashboardTiles: [$v('p_tile0'), $v('p_tile1'), $v('p_tile2')], rentasMesFijas: Number($v('p_rfij')) || 0, rentasMesVariables: Number($v('p_rvar')) || 0 };
   for (const k in n) if (JSON.stringify(DB.settings[k]) !== JSON.stringify(n[k])) { audit('settings', 'global', 'editar', k, DB.settings[k], n[k]); DB.settings[k] = n[k]; }
   saveDB(); render(); toast('Parámetros guardados', 'ok');
 }
@@ -1803,21 +1999,25 @@ function sbInit() {
 /* ---------- mapeo de nombres ---------- */
 const toSnake = (s) => s.replace(/[A-Z]/g, m => '_' + m.toLowerCase());
 const toCamel = (s) => s.replace(/_([a-z])/g, (m, c) => c.toUpperCase());
-const NUMERIC_COLS = new Set(['value', 'numerator', 'denominator', 'quantity', 'target', 'weight', 'green_threshold', 'yellow_threshold', 'number', 'year']);
-const TABLES = ['roles', 'areas', 'positions', 'users', 'quarters', 'reporting_weeks', 'kpis', 'user_kpi_targets', 'chains', 'user_chain_assignments', 'chain_requests', 'weekly_submissions', 'weekly_kpi_values', 'kpi_chain_breakdowns', 'annual_kpi_entries', 'comments'];
+const NUMERIC_COLS = new Set(['value', 'numerator', 'denominator', 'quantity', 'seq', 'install_days', 'target', 'weight', 'green_threshold', 'yellow_threshold', 'number', 'year']);
+const TABLES = ['roles', 'areas', 'positions', 'users', 'quarters', 'reporting_weeks', 'kpis', 'user_kpi_targets', 'chains', 'user_chain_assignments', 'chain_requests', 'weekly_submissions', 'weekly_kpi_values', 'kpi_chain_breakdowns', 'kpi_local_items', 'annual_kpi_entries', 'comments'];
 const CLIENT_ONLY = { users: ['password'] };
 function rowToClient(t, r) { const o = {}; for (const k in r) { let v = r[k]; if (NUMERIC_COLS.has(k) && v != null && v !== '') v = Number(v); o[toCamel(k)] = v; } return o; }
 function rowToDb(t, r) { const o = {}; for (const k in r) { if ((CLIENT_ONLY[t] || []).includes(k)) continue; o[toSnake(k)] = r[k] === '' ? null : r[k]; } return o; }
-const SETTINGS_KEYS = ['defaultGreen', 'defaultYellow', 'appName', 'company', 'reminderText', 'dashboardTiles', 'weekMode', 'partialWeeks', 'simDate'];
+const SETTINGS_KEYS = ['defaultGreen', 'defaultYellow', 'appName', 'company', 'reminderText', 'dashboardTiles', 'weekMode', 'partialWeeks', 'simDate', 'rentasMesFijas', 'rentasMesVariables'];
 
 /* ---------- carga ---------- */
 async function sbLoadAll() {
   const db = { settings: {}, audit_logs: [] };
   const results = await Promise.all(TABLES.map(t => SB.from(t).select('*')));
-  results.forEach((res, i) => { if (res.error) throw new Error(`${TABLES[i]}: ${res.error.message}`); db[TABLES[i]] = res.data.map(r => rowToClient(TABLES[i], r)); });
+  const OPTIONAL = ['kpi_local_items']; // tablas de versiones nuevas: si aún no existen en la base, se tratan como vacías
+  results.forEach((res, i) => {
+    if (res.error) { if (OPTIONAL.includes(TABLES[i]) && /schema cache|does not exist/i.test(res.error.message)) { console.warn('Tabla pendiente de crear en Supabase:', TABLES[i]); db[TABLES[i]] = []; return; } throw new Error(`${TABLES[i]}: ${res.error.message}`); }
+    db[TABLES[i]] = res.data.map(r => rowToClient(TABLES[i], r));
+  });
   const st = await SB.from('settings').select('*'); if (st.error) throw new Error('settings: ' + st.error.message);
   for (const row of st.data) { const k = toCamel(row.key); db.settings[k] = row.value && typeof row.value === 'object' && 'value' in row.value ? row.value.value : row.value; }
-  db.settings = { defaultGreen: 100, defaultYellow: 70, appName: 'Control Semanal de KPIs', company: 'ALVACO · Comercialización', reminderText: 'Tu actualización semanal de KPIs está pendiente.', weekMode: 'lun-vie', partialWeeks: 'excluir', simDate: null, dashboardTiles: [], ...db.settings };
+  db.settings = { defaultGreen: 100, defaultYellow: 70, appName: 'Control Semanal de KPIs', company: 'ALVACO · Comercialización', reminderText: 'Tu actualización semanal de KPIs está pendiente.', weekMode: 'lun-vie', partialWeeks: 'excluir', simDate: null, dashboardTiles: [], rentasMesFijas: 0, rentasMesVariables: 0, ...db.settings };
   db.settings.defaultGreen = Number(db.settings.defaultGreen); db.settings.defaultYellow = Number(db.settings.defaultYellow);
   // tarjetas del dashboard: pueden venir como código de KPI (seed) o como id
   db.settings.dashboardTiles = (db.settings.dashboardTiles || []).map(x => (db.kpis.find(k => k.id === x) || db.kpis.find(k => k.code === x) || {}).id).filter(Boolean);
@@ -1859,6 +2059,8 @@ async function sbPushDiff() {
   await ins('weekly_kpi_values', d.weekly_kpi_values.ins); await upd('weekly_kpi_values', d.weekly_kpi_values.upd);
   await del('kpi_chain_breakdowns', d.kpi_chain_breakdowns.del);
   await ins('kpi_chain_breakdowns', d.kpi_chain_breakdowns.ins); await upd('kpi_chain_breakdowns', d.kpi_chain_breakdowns.upd);
+  await del('kpi_local_items', d.kpi_local_items.del);
+  await ins('kpi_local_items', d.kpi_local_items.ins); await upd('kpi_local_items', d.kpi_local_items.upd);
   for (const r of d.weekly_submissions.ins) { if (r.status !== 'borrador') await sbRun(SB.from('weekly_submissions').update(rowToDb('weekly_submissions', { status: r.status, comment: r.comment })).eq('id', r.id), 'weekly_submissions'); }
   await upd('weekly_submissions', d.weekly_submissions.upd);
   await ins('annual_kpi_entries', d.annual_kpi_entries.ins);
@@ -1990,15 +2192,15 @@ function renderLogin() {
       </div></div></div>`;
   }
   return `<div class="login"><div class="login-box">
-    <div class="login-left"><img src="${IMG.checklist}" alt=""><div class="brand-title">Control Semanal<br>de KPIs</div><div style="opacity:.85;font-size:14px;margin-top:6px">ALVACO · Comercialización</div></div>
-    <div class="login-right"><h2 class="brand-title" style="font-size:26px">Iniciar sesión</h2>
-      <p class="muted small">Entra con tu correo corporativo (<b>@alvaco.com.mx</b>) y la contraseña inicial <b>Comer26</b> (puedes cambiarla después desde el menú).</p>
+    <div class="login-left"><div><div class="brand-title">Control Semanal<br>de KPIs</div><div style="opacity:.85;font-size:12px;letter-spacing:2px;text-transform:uppercase;margin-top:8px">ALVACO · Comercialización</div></div><img src="${IMG.checklist}" alt=""><div class="steps-l"><span><b>1</b>Captura tus KPIs cada viernes</span><span><b>2</b>Desglosa por cadena</span><span><b>3</b>Envía y sigue tu avance en tiempo real</span></div></div>
+    <div class="login-right"><div class="row" style="gap:12px;margin-bottom:22px"><img src="${IMG.peek}" alt="" style="width:56px"><div><h2 class="brand-title" style="font-size:28px">Iniciar sesión</h2><div class="muted small">Bienvenido de vuelta. Usa tu correo corporativo.</div></div></div>
       <form onsubmit="sbLogin(document.getElementById('lg_email').value, document.getElementById('lg_pass').value); return false;">
         <div class="field"><label>Correo</label><input id="lg_email" type="email" autocomplete="username" placeholder="nombre@alvaco.com.mx" required></div>
         <div class="field"><label>Contraseña</label><input id="lg_pass" type="password" autocomplete="current-password" required></div>
-        <div class="row between"><button class="btn" id="loginBtn" type="submit">Entrar</button><span class="small muted">¿Problemas para entrar? Pide al administrador que restablezca tu contraseña.</span></div>
+        <button class="btn" id="loginBtn" type="submit">Entrar a la plataforma ${ICONS.send || ''}</button>
       </form>
-      <p class="small muted mt24">¿No tienes acceso? Pide al administrador de la plataforma que te registre con tu correo.</p>
+      <div class="msg info mt16" style="align-items:flex-start;font-weight:400">${ICONS.shield}<span><b>Acceso seguro.</b> Solo correos <b>@alvaco.com.mx</b> y dominios autorizados. Si es tu primera vez, entra con la contraseña inicial <b>Comer26</b> y cámbiala desde el menú.</span></div>
+      <p class="small muted mt16 center">¿Problemas para entrar? Pide a Inteligencia Comercial que restablezca tu contraseña.</p>
     </div></div></div>`;
 }
 
