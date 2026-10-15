@@ -1121,9 +1121,9 @@ function buildExportSheets(qid) {
 
 /* ---------- Router & shell ---------- */
 const MENUS = {
-  EJECUTIVO: [['inicio', 'Inicio', 'home'], ['avance', 'Mi avance', 'chart'], ['captura', 'Captura semanal', 'edit'], ['calendario', 'Calendario', 'cal'], ['historial', 'Historial', 'hist']],
-  DIRECTIVO: [['dashboard', 'Dashboard', 'chart'], ['ejecutivos', 'Ejecutivos', 'users'], ['kpis', 'KPIs', 'target'], ['cadenas', 'Cadenas', 'store'], ['historico', 'Histórico', 'hist']],
-  ADMIN: [['dashboard', 'Dashboard', 'chart'], ['usuarios', 'Usuarios', 'users'], ['kpis', 'KPIs', 'target'], ['metas', 'Metas', 'layers'], ['cadenas', 'Cadenas', 'store'], ['asignaciones', 'Asignaciones', 'link'], ['periodos', 'Periodos', 'cal'], ['semanas', 'Semanas', 'list'], ['parametros', 'Parámetros', 'settings'], ['auditoria', 'Auditoría', 'shield']]
+  EJECUTIVO: [['inicio', 'Inicio', 'home'], ['avance', 'Mi avance', 'chart'], ['captura', 'Captura semanal', 'edit'], ['calendario', 'Calendario', 'cal'], ['historial', 'Historial', 'hist'], ['micopilot', 'Mis datos para Copilot', 'download']],
+  DIRECTIVO: [['dashboard', 'Dashboard', 'chart'], ['ejecutivos', 'Ejecutivos', 'users'], ['kpis', 'KPIs', 'target'], ['cadenas', 'Cadenas', 'store'], ['historico', 'Histórico', 'hist'], ['copilot', 'Exportar para Copilot', 'download']],
+  ADMIN: [['dashboard', 'Dashboard', 'chart'], ['usuarios', 'Usuarios', 'users'], ['kpis', 'KPIs', 'target'], ['metas', 'Metas', 'layers'], ['cadenas', 'Cadenas', 'store'], ['asignaciones', 'Asignaciones', 'link'], ['periodos', 'Periodos', 'cal'], ['semanas', 'Semanas', 'list'], ['parametros', 'Parámetros', 'settings'], ['auditoria', 'Auditoría', 'shield'], ['copilot', 'Exportar para Copilot', 'download']]
 };
 let ROUTE = { view: null, params: {} };
 function nav(view, params = {}) { ROUTE = { view, params }; location.hash = view; if (window.innerWidth <= 900) SIDE.collapsed = true; render(); }
@@ -1142,7 +1142,7 @@ function render() {
   const role = roleOf(u).code; let menu = MENUS[role];
   // Administradores/directivos con KPIs propios también ven su captura personal.
   const ownKpis = role !== 'EJECUTIVO' && hasOwnKpis(u);
-  if (ownKpis) menu = menu.concat([['sep', 'Mis KPIs'], ['avance', 'Mi avance', 'chart'], ['captura', 'Mi captura semanal', 'edit'], ['historial', 'Mi historial', 'hist']]);
+  if (ownKpis) menu = menu.concat([['sep', 'Mis KPIs'], ['avance', 'Mi avance', 'chart'], ['captura', 'Mi captura semanal', 'edit'], ['historial', 'Mi historial', 'hist'], ['micopilot', 'Mis datos para Copilot', 'download']]);
   if (!ROUTE.view || !menu.find(m => m[0] === ROUTE.view && m[0] !== 'sep')) ROUTE = { view: menu[0][0], params: {} };
   const q = activeQuarter(); const cw = q ? currentWeek(q.id) : null;
   const navHTML = menu.map(m => m[0] === 'sep' ? `<div class="sec">${m[1]}</div>` : `<a href="#${m[0]}" class="${ROUTE.view === m[0] ? 'active' : ''}" onclick="nav('${m[0]}');return false;">${ICONS[m[2]]}${m[1]}</a>`).join('');
@@ -2030,6 +2030,162 @@ VIEWS['ADMIN:auditoria'] = () => {
     `<div class="filters"><div class="f"><label>Entidad</label><select onchange="AUD.entity=this.value;render()"><option value="">Todas</option>${ents.map(e => `<option value="${e}" ${AUD.entity === e ? 'selected' : ''}>${e}</option>`).join('')}</select></div><div class="f"><label>Usuario</label><select onchange="AUD.userId=this.value;render()"><option value="">Todos</option>${DB.users.map(x => `<option value="${x.id}" ${AUD.userId === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div><div class="f"><label>Buscar</label><input value="${esc(AUD.q)}" onchange="AUD.q=this.value;render()" placeholder="texto…"></div><button class="btn sec sm" onclick="exportWorkbook([{name:'Auditoria',rows:[['Fecha','Usuario','Entidad','ID','Acción','Campo','Anterior','Nuevo'],...DB.audit_logs.map(l=>[l.ts,nameOf('users',l.userId,'sistema'),l.entity,l.entityId,l.action,l.field,l.oldValue,l.newValue])]}],'Auditoria_KPIs.xlsx')">${ICONS.download}Exportar</button></div>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fecha</th><th>Usuario</th><th>Entidad</th><th>Contexto</th><th>Acción</th><th>Campo</th><th>Anterior</th><th>Nuevo</th></tr></thead><tbody>${logs.map(l => `<tr><td class="small" style="white-space:nowrap">${fmtDateTime(l.ts)}</td><td>${esc(nameOf('users', l.userId, 'sistema'))}</td><td><span class="badge b-azul">${esc(l.entity)}</span></td><td class="small">${esc(ctx(l))}</td><td>${badge(/elimin|cerrar|bloq/.test(l.action) ? 'b-rojo' : /crear|enviar|aprobar/.test(l.action) ? 'b-verde' : 'b-mor', l.action)}</td><td class="small">${esc(l.field ?? '')}</td><td class="small muted">${esc(l.oldValue ?? '')}</td><td class="small"><b>${esc(l.newValue ?? '')}</b></td></tr>`).join('') || '<tr><td colspan="8" class="center muted">Sin eventos</td></tr>'}</tbody></table></div>`;
 };
+
+/* =====================================================================
+   EXPORTACIÓN PARA COPILOT (PowerPoint)
+   Un archivo CSV por KPI con estructura tipo base de datos (un renglón por ejecutivo y semana,
+   o por actualización en los anuales), más un diccionario de datos y el prompt predefinido.
+   ===================================================================== */
+const CSV_SEP = ',';
+function csvCell(v) { if (v == null) return ''; const s = String(v); return /[",\n\r;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function csvText(rows) { return '﻿' + rows.map(r => r.map(csvCell).join(CSV_SEP)).join('\r\n') + '\r\n'; }
+function downloadText(filename, text, mime = 'text/csv;charset=utf-8') {
+  const blob = new Blob([text], { type: mime }); const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+const n2 = (x) => x == null || x === '' || isNaN(Number(x)) ? '' : Math.round(Number(x) * 100) / 100;
+function slugFile(s) { return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, ''); }
+function semLabel(sem) { return sem ? sem.label : ''; }
+
+/* Encabezado común a todos los CSV (mismo orden siempre, para que el prompt de Copilot sea estable) */
+const CSV_HEADER = ['kpi_codigo', 'kpi_nombre', 'kpi_tipo', 'periodicidad', 'unidad', 'modo_captura', 'periodo', 'anio', 'semana', 'fecha_inicio', 'fecha_fin', 'ejecutivo', 'correo', 'puesto', 'area', 'meta', 'peso_pct', 'valor_semana', 'numerador', 'denominador', 'acumulado', 'cumplimiento_pct', 'trayectoria_esperada_pct', 'semaforo', 'estado_captura', 'fecha_envio', 'detalle', 'comentario'];
+
+function kpiCsvRows(kpiId, qid, onlyUserId = null) {
+  const kpi = byId('kpis', kpiId); const rows = [CSV_HEADER]; const q = byId('quarters', qid); const ref = refDate();
+  const users = DB.users.filter(u => u.active && roleOf(u).code !== 'DIRECTIVO' && (!onlyUserId || u.id === onlyUserId)).sort((a, b) => a.name.localeCompare(b.name));
+  const base = (u) => [kpi.code, kpi.name, kpi.type, kpi.periodicity, kpi.unit, kpi.captureMode || 'normal'];
+  const who = (u) => [u.name, u.email, nameOf('positions', u.positionId, ''), nameOf('areas', u.areaId, '')];
+  if (kpi.periodicity === 'anual') {
+    const year = q ? parseISO(q.startDate).getFullYear() : new Date(ref).getFullYear();
+    // corporativo: un solo bloque a nivel compañía (el mismo avance aplica a todos)
+    const list = isCorporativoKpi(kpi) ? [{ id: (users.find(x => annualTarget(x.id, kpi.id, year)) || users[0]).id, name: 'ALVACO (dato corporativo)', email: '', positionId: null, areaId: null }] : users;
+    for (const u of list) {
+      const t = annualTarget(u.id, kpi.id, year); if (!t && !isCorporativoKpi(kpi)) continue;
+      const k = computeAnnualKpi(u.id, kpi.id, year, { cutoff: '9999' });
+      if (!k.entries.length) { rows.push([...base(u), 'Año ' + year, year, '', '', '', ...who(u), n2(k.meta), isCorporativoKpi(kpi) ? '' : n2(k.weight), '', '', '', '', '', '', 'Sin actualizaciones', 'sin captura', '', '', '']); continue; }
+      let prev = null;
+      for (const e of k.entries) {
+        const cur = kpi.type === 'A' ? Number(e.value) : (e.denominator > 0 ? e.numerator / e.denominator * 100 : null);
+        const pct = pctOf(kpi, k.meta, cur); const sem = semaforo(pct, k.thr);
+        rows.push([...base(u), 'Año ' + year, year, '', e.ts.slice(0, 10), '', ...who(u), n2(k.meta), isCorporativoKpi(kpi) ? '' : n2(k.weight), n2(cur), n2(e.numerator), n2(e.denominator), n2(cur), n2(pct), '', semLabel(sem), 'actualización', e.ts.slice(0, 19).replace('T', ' '), e.detail ? listaLines(e.detail).join(' | ') : '', e.comment || '']);
+        prev = cur;
+      }
+    }
+    return rows;
+  }
+  const weeks = weeksOf(qid).filter(w => w.startDate <= ref);
+  for (const u of users) {
+    const t = kpiTarget(u.id, kpi.id, qid); if (!t) continue;
+    const r = computeKpi(u.id, kpi.id, qid, null, { includeDraft: true }); const all = weeksOf(qid);
+    for (const sw of r.series) {
+      const w = sw.week; if (w.startDate > ref) continue;
+      const s = submissionOf(u.id, w.id); const v = sw.raw;
+      const upto = computeKpi(u.id, kpi.id, qid, w.number, { includeDraft: true });
+      const expected = kpi.type === 'A' && r.meta > 0 ? (r.meta * w.number / all.length) / r.meta * 100 : (r.meta ? 100 : null);
+      let detalle = '';
+      if (v) {
+        if (isLocalesKpi(kpi)) detalle = localItemsOf(v.id).map(it => `${it.kind} ${it.referenceDate} ${it.installDays}d`).join(' | ');
+        else if (isListaKpi(kpi) || isConjuntoKpi(kpi)) detalle = v.detail ? listaLines(v.detail).join(' | ') : '';
+        else detalle = breakdownsOf(v.id).map(b => `${nameOf('chains', b.chainId)}: ${fmtNum(b.quantity)}`).join(' | ');
+      }
+      rows.push([...base(u), q.name, parseISO(q.startDate).getFullYear(), w.number, w.startDate, w.endDate, ...who(u), n2(r.meta), n2(r.weight),
+        v ? n2(kpi.type === 'A' ? v.value : sw.value) : '', v ? n2(v.numerator) : '', v ? n2(v.denominator) : '',
+        n2(upto.current), n2(upto.pct), n2(expected), v ? semLabel(upto.sem) : '', s ? s.status : 'sin captura', s && s.submittedAt ? String(s.submittedAt).slice(0, 19).replace('T', ' ') : '', detalle, v ? (v.comment || s.comment || '') : '']);
+    }
+  }
+  return rows;
+}
+
+function dictionaryCsv() {
+  const d = [['columna', 'descripcion'],
+    ['kpi_codigo', 'Clave corta del KPI (INST, LOC, COST, CLI, RPAG, EPAR, PROS, EPERD, MAC, LOCNAC, RFV, LOC30, SALDO, XTREME, INSTWM)'],
+    ['kpi_nombre', 'Nombre del KPI'], ['kpi_tipo', 'A = acumulativo (se suman las semanas) · B = porcentaje del momento (snapshot) · C = ratio numerador/denominador'],
+    ['periodicidad', 'trimestral (captura semanal) o anual (actualización libre con bitácora)'], ['unidad', 'Unidad del valor (equipos, clientes, %, locales…)'],
+    ['modo_captura', 'normal · locales (un renglón por local) · lista (nombres, cada uno cuenta 1) · conjunto (suma de todo el equipo vs. global) · parados (con arrastre de pendientes) · corporativo (un solo valor para la compañía)'],
+    ['periodo', 'Trimestre (p. ej. Octubre – Diciembre 2026) o Año'], ['anio', 'Año'], ['semana', 'Número de semana dentro del trimestre (vacío en anuales)'],
+    ['fecha_inicio', 'Inicio de la semana (en anuales: fecha de la actualización)'], ['fecha_fin', 'Fin de la semana'],
+    ['ejecutivo', 'Nombre del ejecutivo'], ['correo', 'Correo del ejecutivo'], ['puesto', 'Puesto (KAM, KAE, Arquitecto Jr., etc.)'], ['area', 'Área o célula'],
+    ['meta', 'Meta del periodo para ese ejecutivo (cantidad o %)'], ['peso_pct', 'Peso del KPI dentro del cumplimiento ponderado del ejecutivo (%)'],
+    ['valor_semana', 'Lo reportado esa semana (cantidad en tipo A; % en B y C)'], ['numerador', 'Numerador capturado (B y C)'], ['denominador', 'Denominador capturado (B y C)'],
+    ['acumulado', 'Valor acumulado del trimestre hasta esa semana (tipo A: suma; B: último %; C: ratio acumulado)'],
+    ['cumplimiento_pct', 'Acumulado / meta × 100 (en KPIs "menor es mejor" se invierte)'], ['trayectoria_esperada_pct', 'Dónde debería ir el cumplimiento a esa semana si el avance fuera lineal'],
+    ['semaforo', 'Cumplido (verde) · En proceso (amarillo) · Pendiente (rojo) según umbrales'], ['estado_captura', 'enviado · cerrado · reabierto · borrador · sin captura'],
+    ['fecha_envio', 'Fecha y hora en que se envió la semana'], ['detalle', 'Desglose por cadena, nombres de la lista, fijas/variables o locales (separados por |)'], ['comentario', 'Comentario del ejecutivo']];
+  return csvText(d);
+}
+
+const COPILOT_PROMPT = `Eres analista de Inteligencia Comercial de ALVACO. Con base ÚNICAMENTE en el archivo CSV adjunto (un KPI del Control Semanal de KPIs de Comercialización; cada renglón es un ejecutivo en una semana, o una actualización en KPIs anuales), genera una presentación en español con este formato y nada más:
+
+1. Portada: nombre del KPI (columna kpi_nombre), periodo y semana más reciente con datos, fecha de hoy.
+2. Ficha del KPI: qué mide, tipo (kpi_tipo), unidad, cómo se calcula el cumplimiento (acumulado / meta) y los umbrales del semáforo (Cumplido ≥ 100 %, En proceso ≥ 70 %, Pendiente < 70 %, salvo que el CSV indique otra cosa).
+3. Resumen ejecutivo: cumplimiento promedio del equipo en la última semana, cuántos ejecutivos están en verde, amarillo y rojo, y la variación contra la semana anterior. Usa cifras exactas del CSV.
+4. Tendencia: gráfica de líneas del acumulado o cumplimiento por semana (eje X = semana) para el equipo y para los 3 ejecutivos con mayor y menor cumplimiento; compara contra trayectoria_esperada_pct.
+5. Ranking: tabla de ejecutivos ordenada por cumplimiento_pct de la última semana con meta, acumulado, cumplimiento y semáforo.
+6. Observaciones relevantes: 3 a 5 hallazgos concretos (quién acelera, quién se rezaga, semanas sin captura, cadenas o nombres que destacan en la columna detalle, comentarios que expliquen desviaciones).
+7. Riesgos y recomendaciones: acciones puntuales para cerrar la brecha a la meta antes del fin del trimestre, con responsable sugerido.
+8. Cierre: una frase con el mensaje principal para Dirección.
+
+Si el CSV contiene varios KPIs (varios valores en kpi_codigo), haz una portada general con el cumplimiento ponderado y luego repite los puntos 2 a 7 por cada KPI, en el orden en que aparecen; cierra con una sola diapositiva de conclusiones globales.
+
+Si el CSV contiene un solo ejecutivo (columna ejecutivo con un único nombre), la presentación es su reporte individual: omite el ranking y enfoca el resumen, la tendencia y las observaciones en su propio avance contra la meta y la trayectoria esperada, y las recomendaciones en lo que esa persona puede hacer en las semanas que restan.
+
+Reglas: no inventes datos ni ejecutivos; si una semana no tiene captura, dilo. Redondea a un decimal. Usa el nombre tal como aparece en la columna ejecutivo. Tono ejecutivo, frases cortas, máximo 6 viñetas por diapositiva. Colores: azul #3F60A8 para títulos, verde #1E7E34 / ámbar #E0A800 / rojo #C0392B para el semáforo.`;
+
+/* Descarga en UN solo CSV los KPIs marcados con casilla (uno o varios) */
+function cpSelectedIds() { return [...document.querySelectorAll('input.cpSel:checked')].map(c => c.value); }
+function cpToggleAll(on) { document.querySelectorAll('input.cpSel').forEach(c => { c.checked = on; }); cpUpdateCount(); }
+function cpUpdateCount() { const n = cpSelectedIds().length; const b = document.getElementById('cpSelBtn'); if (b) { b.disabled = !n; b.querySelector('span').textContent = n ? `Descargar selección (${n} KPI${n > 1 ? 's' : ''}) en un CSV` : 'Descargar selección en un CSV'; } }
+function downloadSelection(qid, userId, tag) {
+  const ids = cpSelectedIds(); if (!ids.length) { toast('Marca al menos un KPI', 'err'); return; }
+  const out = [CSV_HEADER]; for (const id of ids) out.push(...kpiCsvRows(id, qid, userId || null).slice(1));
+  const codes = ids.map(id => byId('kpis', id).code).join('-');
+  downloadText(`KPIs_${ids.length === 1 ? codes : 'seleccion_' + codes}${tag ? '_' + tag : ''}_${slugFile(byId('quarters', qid).code)}.csv`, csvText(out));
+}
+const cpSelBar = (qid, userId, tag) => `<div class="row" style="gap:8px"><button class="btn sm ghost" onclick="cpToggleAll(true)">Marcar todos</button><button class="btn sm ghost" onclick="cpToggleAll(false)">Desmarcar</button><button class="btn sm mor" id="cpSelBtn" disabled onclick="downloadSelection('${qid}',${userId ? `'${userId}'` : 'null'},'${tag || ''}')">${ICONS.download}<span>Descargar selección en un CSV</span></button></div>`;
+function copilotExportHTML(u, q) {
+  const kpis = DB.kpis.filter(k => k.active !== false).sort((a, b) => (a.periodicity === b.periodicity ? 0 : a.periodicity === 'trimestral' ? -1 : 1) || a.name.localeCompare(b.name));
+  const qs = DB.quarters.slice().sort((a, b) => b.startDate.localeCompare(a.startDate));
+  const qid = (window.__cpQ && byId('quarters', window.__cpQ)) ? window.__cpQ : q.id;
+  return topbar('Exportar para Copilot', 'Un archivo CSV por KPI con estructura tipo base de datos (un renglón por ejecutivo y semana). Adjúntalos a Copilot en PowerPoint con el prompt predefinido para generar las presentaciones.', [[esc(byId('quarters', qid).name), 'm']]) +
+    `<div class="filters"><div class="f"><label>Periodo trimestral</label><select onchange="window.__cpQ=this.value;render()">${qs.map(x => `<option value="${x.id}" ${x.id === qid ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
+      <div class="row"><button class="btn" onclick="copilotDownloadAll('${qid}')">${ICONS.download}Descargar todos los CSV</button><button class="btn sec" onclick="downloadText('00_diccionario_de_datos.csv', dictionaryCsv())">${ICONS.download}Diccionario de datos</button><button class="btn sec" onclick="downloadText('00_prompt_copilot.txt', COPILOT_PROMPT, 'text/plain;charset=utf-8')">${ICONS.download}Prompt (.txt)</button></div></div>
+    <div class="tbl-title"><h3>Elige uno o varios KPIs</h3>${cpSelBar(qid, null, '')}</div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th style="width:36px"></th><th>KPI</th><th>Periodicidad</th><th>Modo</th><th class="num">Ejecutivos</th><th class="num">Renglones</th><th>Archivo</th><th></th></tr></thead><tbody>
+    ${kpis.map(k => { const rows = kpiCsvRows(k.id, qid); const n = rows.length - 1; const ex = new Set(rows.slice(1).map(r => r[11])).size; const fn = `KPI_${k.code}_${slugFile(k.name)}_${slugFile(byId('quarters', qid).code)}.csv`; return `<tr><td><input type="checkbox" class="cpSel" value="${k.id}" style="width:18px;height:18px" onchange="cpUpdateCount()"></td><td><b>${esc(k.name)}</b><div class="small muted">${esc(k.code)}</div></td><td>${k.periodicity}</td><td>${esc(k.captureMode || 'normal')}</td><td class="num">${ex}</td><td class="num">${n}</td><td class="small muted">${esc(fn)}</td><td class="right"><button class="btn sm sec" onclick="downloadText('${fn}', csvText(kpiCsvRows('${k.id}','${qid}')))">${ICONS.download}CSV</button></td></tr>`; }).join('')}
+    </tbody></table></div>
+    <div class="grid g2 mt24"><div class="card acc-m"><h3>Cómo usarlo en PowerPoint</h3><ol style="margin:0;padding-left:18px;line-height:1.6"><li>Descarga el CSV del KPI (o todos) y guárdalos en OneDrive o SharePoint.</li><li>Abre PowerPoint → Copilot → <b>Crear presentación a partir de archivo</b> o adjunta el CSV con el clip.</li><li>Pega el prompt predefinido (botón "Prompt (.txt)") y envía.</li><li>Revisa cifras contra el Dashboard antes de compartir.</li></ol><p class="small muted mt8">Los archivos van en UTF-8 con separador coma; Excel los abre directo. El orden de columnas es siempre el mismo, así el prompt no cambia.</p></div>
+    <div class="card acc-c"><h3>Prompt predefinido</h3><textarea id="cpPrompt" rows="10" style="font-size:13px" readonly>${esc(COPILOT_PROMPT)}</textarea><div class="row mt8"><button class="btn sm" onclick="navigator.clipboard.writeText(COPILOT_PROMPT).then(()=>toast('Prompt copiado','ok'))">Copiar prompt</button></div></div></div>`;
+}
+async function copilotDownloadAll(qid) {
+  const kpis = DB.kpis.filter(k => k.active !== false);
+  downloadText('00_diccionario_de_datos.csv', dictionaryCsv()); await new Promise(r => setTimeout(r, 400));
+  downloadText('00_prompt_copilot.txt', COPILOT_PROMPT, 'text/plain;charset=utf-8'); await new Promise(r => setTimeout(r, 400));
+  for (const k of kpis) { downloadText(`KPI_${k.code}_${slugFile(k.name)}_${slugFile(byId('quarters', qid).code)}.csv`, csvText(kpiCsvRows(k.id, qid))); await new Promise(r => setTimeout(r, 450)); }
+  toast(`${kpis.length} archivos CSV descargados (si el navegador pregunta, permite descargas múltiples)`, 'ok');
+}
+/* Versión individual: cada ejecutivo descarga SOLO sus KPIs (y un CSV con todos sus KPIs juntos) */
+function myCopilotHTML(u, q) {
+  const qid = (window.__cpQ && byId('quarters', window.__cpQ)) ? window.__cpQ : q.id; const qq = byId('quarters', qid); const year = parseISO(qq.startDate).getFullYear();
+  const qs = DB.quarters.slice().sort((a, b) => b.startDate.localeCompare(a.startDate));
+  const tri = targetsOf(u.id, qid).map(t => byId('kpis', t.kpiId)); const anu = annualTargetsOf(u.id, year).map(t => byId('kpis', t.kpiId));
+  const kpis = [...tri, ...anu].filter(Boolean);
+  const first = u.name.split(' ')[0]; const tag = slugFile(u.name.split(' ').slice(0, 2).join('_'));
+  const allRows = () => { const out = [CSV_HEADER]; for (const k of kpis) out.push(...kpiCsvRows(k.id, qid, u.id).slice(1)); return out; };
+  window.__myCsvAll = allRows;
+  return topbar('Mis datos para Copilot', 'Descarga tus KPIs en CSV (estructura tipo base de datos: un renglón por semana) y adjúntalos a Copilot en PowerPoint con el prompt predefinido para generar tu presentación.', [[esc(qq.name), 'm']]) +
+    `<div class="filters"><div class="f"><label>Periodo trimestral</label><select onchange="window.__cpQ=this.value;render()">${qs.map(x => `<option value="${x.id}" ${x.id === qid ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
+      <div class="row"><button class="btn" onclick="downloadText('Mis_KPIs_${tag}_${slugFile(qq.code)}.csv', csvText(window.__myCsvAll()))">${ICONS.download}Descargar todos mis KPIs (un CSV)</button><button class="btn sec" onclick="downloadText('00_prompt_copilot.txt', COPILOT_PROMPT, 'text/plain;charset=utf-8')">${ICONS.download}Prompt (.txt)</button></div></div>
+    <div class="tbl-title"><h3>O elige uno o varios KPIs</h3>${cpSelBar(qid, u.id, tag)}</div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th style="width:36px"></th><th>KPI</th><th>Periodicidad</th><th class="num">Renglones</th><th>Archivo</th><th></th></tr></thead><tbody>
+    ${kpis.map(k => { const n = kpiCsvRows(k.id, qid, u.id).length - 1; const fn = `KPI_${k.code}_${slugFile(k.name)}_${tag}_${slugFile(qq.code)}.csv`; return `<tr><td><input type="checkbox" class="cpSel" value="${k.id}" style="width:18px;height:18px" onchange="cpUpdateCount()"></td><td><b>${esc(k.name)}</b><div class="small muted">${esc(k.code)}${isCorporativoKpi(k) ? ' · dato corporativo' : ''}</div></td><td>${k.periodicity}</td><td class="num">${n}</td><td class="small muted">${esc(fn)}</td><td class="right"><button class="btn sm sec" onclick="downloadText('${fn}', csvText(kpiCsvRows('${k.id}','${qid}','${u.id}')))">${ICONS.download}CSV</button></td></tr>`; }).join('') || '<tr><td colspan="6" class="center muted">No tienes KPIs asignados en este periodo</td></tr>'}
+    </tbody></table></div>
+    <div class="grid g2 mt24"><div class="card acc-m"><h3>Cómo generar tu presentación</h3><ol style="margin:0;padding-left:18px;line-height:1.6"><li>Descarga el CSV (uno por KPI, o todos juntos) y guárdalo en tu OneDrive.</li><li>Abre PowerPoint → Copilot → adjunta el CSV con el clip.</li><li>Copia el prompt de la derecha, pégalo y envía.</li><li>Revisa las cifras contra tu pantalla de Inicio antes de compartir.</li></ol><p class="small muted mt8">El archivo solo contiene tus datos. Copilot detecta que es un reporte individual y arma la presentación enfocada en tu avance.</p></div>
+    <div class="card acc-c"><h3>Prompt predefinido</h3><textarea rows="10" style="font-size:13px" readonly>${esc(COPILOT_PROMPT)}</textarea><div class="row mt8"><button class="btn sm" onclick="navigator.clipboard.writeText(COPILOT_PROMPT).then(()=>toast('Prompt copiado','ok'))">Copiar prompt</button></div></div></div>`;
+}
+VIEWS['EJECUTIVO:micopilot'] = (u, q) => myCopilotHTML(u, q);
+VIEWS['ADMIN:copilot'] = (u, q) => copilotExportHTML(u, q);
+VIEWS['DIRECTIVO:copilot'] = (u, q) => copilotExportHTML(u, q);
 
 /* =====================================================================
    CAPA DE DATOS SUPABASE (producción)
