@@ -1820,7 +1820,7 @@ function teamDashboardHTML(u, q, cw) {
   const pendientes = d.users.filter(x => !d.reportedNow.includes(x));
   const okN = tot.filter(t => t.sem.code === 'verde').length, warnN = tot.filter(t => t.sem.code === 'amarillo').length, badN = tot.filter(t => ['rojo', 'gris'].includes(t.sem.code)).length;
   const avgTeam = (() => { const p = tot.filter(t => t.pct != null); return p.length ? p.reduce((a, t) => a + t.pct, 0) / p.length : null; })();
-  const sub = team.length ? `Totales de ${team.length} ejecutivo(s) a tu cargo: ${team.map(x => esc(x.name.split(' ')[0])).join(', ')}. ${esc(scopeLabel(d.scope))}. Haz clic en un ejecutivo para ver su detalle.` : 'Aún no tienes ejecutivos asignados; pide a Inteligencia Comercial que los relacione contigo en Usuarios.';
+  const sub = team.length ? `${hasOwnKpis(u) ? 'Tus KPIs personales están en el menú “Mis KPIs”. ' : ''}Totales de ${team.length} ejecutivo(s) a tu cargo: ${team.map(x => esc(x.name.split(' ')[0])).join(', ')}. ${esc(scopeLabel(d.scope))}. Haz clic en un ejecutivo para ver su detalle.` : 'Aún no tienes ejecutivos asignados; pide a Inteligencia Comercial que los relacione contigo en Usuarios.';
   const html = topbar('Mi equipo', sub, biChips()) + corporativoCardHTML(u) + biFiltersHTML(qq) +
     `<div class="grid g4">
       <div class="card kpi-tile acc-m"><div class="eyebrow">Avance general del equipo</div><div class="big m">${fmtPct(avgTeam)}</div><div class="delta">Promedio de cumplimiento de los KPIs del equipo · pond. trim. ${fmtPct(d.avgW, 0)}</div></div>
@@ -2164,7 +2164,7 @@ const CSV_HEADER = ['kpi_codigo', 'kpi_nombre', 'kpi_tipo', 'periodicidad', 'uni
 
 function kpiCsvRows(kpiId, qid, onlyUserId = null) {
   const kpi = byId('kpis', kpiId); const rows = [CSV_HEADER]; const q = byId('quarters', qid); const ref = refDate();
-  const me = currentUser(); const users = DB.users.filter(u => u.active && !['DIRECTIVO', 'COORDINADOR'].includes(roleOf(u).code) && (!onlyUserId || u.id === onlyUserId) && (!isCoord(me) || u.supervisorId === me.id)).sort((a, b) => a.name.localeCompare(b.name));
+  const me = currentUser(); const users = DB.users.filter(u => u.active && (onlyUserId ? u.id === onlyUserId : (roleOf(u).code !== 'DIRECTIVO' && (!isCoord(me) || u.supervisorId === me.id) && (!isCoord(u) || hasOwnKpis(u))))).sort((a, b) => a.name.localeCompare(b.name));
   const base = (u) => [kpi.code, kpi.name, kpi.type, kpi.periodicity, kpi.unit, kpi.captureMode || 'normal'];
   const who = (u) => [u.name, u.email, nameOf('positions', u.positionId, ''), nameOf('areas', u.areaId, '')];
   if (kpi.periodicity === 'anual') {
