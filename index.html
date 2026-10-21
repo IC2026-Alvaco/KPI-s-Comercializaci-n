@@ -285,8 +285,8 @@ table.tbl .mini-bar i{display:block;height:100%;background:var(--azul);border-ra
 .closex{background:none;border:none;font-size:26px;color:var(--txt2);line-height:1}
 .field{margin-bottom:12px}
 .fields{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-.fields.c3{grid-template-columns:repeat(3,1fr)}
-@media(max-width:640px){.fields,.fields.c3{grid-template-columns:1fr}}
+.fields.c3{grid-template-columns:repeat(3,1fr)}.fields.c4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:640px){.fields,.fields.c3,.fields.c4{grid-template-columns:1fr}}
 
 /* CAPTURE */
 .capture-kpi{background:#fff;border:1px solid var(--card-b);border-radius:16px;padding:16px 18px 16px 20px;margin-bottom:16px;position:relative;overflow:hidden;box-shadow:0 4px 18px rgba(31,56,100,.06)}
@@ -500,6 +500,8 @@ const isConteoKpi = (k) => !!k && k.type === 'C' && k.numeratorMode === 'acumula
 function listaLines(txt) { return String(txt || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean); }
 function localItemsOf(valueId) { return where('kpi_local_items', b => b.weeklyKpiValueId === valueId).sort((a, b) => a.seq - b.seq); }
 const localItemFast = (it) => Number(it.installDays) <= 30;
+/* Días de instalación = fecha de instalación (fin) − fecha de referencia (inicio), en días naturales */
+function localDaysBetween(ini, fin) { if (!ini || !fin || !/^\d{4}-\d{2}-\d{2}$/.test(ini) || !/^\d{4}-\d{2}-\d{2}$/.test(fin)) return null; const d = Math.round((parseISO(fin) - parseISO(ini)) / 86400000); return d < 0 ? null : d; }
 const LOCAL_KINDS = { nuevo: { label: 'Local nuevo', dateLabel: 'Fecha en que llegó el contrato o carta de entrada' }, reacondicionado: { label: 'Local reacondicionado', dateLabel: 'Fecha en que se pidió permiso para entrar al local' } };
 const COUNTED = ['enviado', 'cerrado', 'reabierto'];
 
@@ -742,7 +744,9 @@ function validateCapture(user, week, payload, mode = 'enviar') {
       items.forEach((it, j) => {
         const faltan = [];
         if (!LOCAL_KINDS[it.kind]) faltan.push('tipo (nuevo / reacondicionado)');
-        if (!it.referenceDate || !/^\d{4}-\d{2}-\d{2}$/.test(it.referenceDate)) faltan.push('fecha');
+        if (!it.referenceDate || !/^\d{4}-\d{2}-\d{2}$/.test(it.referenceDate)) faltan.push('fecha de inicio');
+        if (it.installDate && it.referenceDate && localDaysBetween(it.referenceDate, it.installDate) == null) faltan.push('fecha de instalación anterior a la de inicio');
+        else if (!it.installDate && (it.installDays === '' || it.installDays == null)) faltan.push('fecha de instalación');
         if (it.installDays === '' || it.installDays == null || isNaN(Number(it.installDays)) || Number(it.installDays) < 0 || Number(it.installDays) !== Math.floor(Number(it.installDays))) faltan.push('días de instalación');
         if (faltan.length && mode === 'enviar') e.push(`Local ${j + 1}: falta ${faltan.join(', ')}`);
       });
@@ -803,11 +807,11 @@ function saveCapture(user, week, payload, mode) {
     }
     // detalle por local (KPI Locales)
     if (isLocalesKpi(kpi)) {
-      const old = localItemsOf(v.id); const items = (p.items || []).map((it, j) => ({ seq: j + 1, kind: it.kind, referenceDate: it.referenceDate, installDays: Number(it.installDays), note: it.note || null }));
+      const old = localItemsOf(v.id); const items = (p.items || []).map((it, j) => ({ seq: j + 1, kind: it.kind, referenceDate: it.referenceDate, installDate: it.installDate || null, installDays: Number(it.installDays), note: it.note || null }));
       for (const ob of old) { if (ob.seq > items.length) { audit('kpi_local_items', ob.id, 'eliminar', `${kpi.name} local ${ob.seq}`, `${ob.kind} ${ob.referenceDate} ${ob.installDays}d`, null); DB.kpi_local_items = DB.kpi_local_items.filter(x => x.id !== ob.id); } }
       for (const it of items) {
         const ex = localItemsOf(v.id).find(x => x.seq === it.seq);
-        if (ex) { for (const f of ['kind', 'referenceDate', 'installDays', 'note']) { if ((ex[f] ?? null) !== (it[f] ?? null)) { audit('kpi_local_items', ex.id, 'editar', `${kpi.name} local ${it.seq}.${f}`, ex[f], it[f]); ex[f] = it[f]; } } }
+        if (ex) { for (const f of ['kind', 'referenceDate', 'installDate', 'installDays', 'note']) { if ((ex[f] ?? null) !== (it[f] ?? null)) { audit('kpi_local_items', ex.id, 'editar', `${kpi.name} local ${it.seq}.${f}`, ex[f], it[f]); ex[f] = it[f]; } } }
         else { const r = { id: uid('loc'), weeklyKpiValueId: v.id, ...it }; DB.kpi_local_items.push(r); audit('kpi_local_items', r.id, 'crear', `${kpi.name} local ${it.seq}`, null, `${it.kind} ${it.referenceDate} ${it.installDays}d`); }
       }
     }
@@ -1384,7 +1388,7 @@ function payloadFromSubmission(u, q, s, w = null) {
     // Ratio con denominador "snapshot" (p. ej. universo de tiendas a prospectar): se propone el último denominador capturado
     let denPrev = '';
     if (!v && w && kpi.type === 'C' && kpi.denominatorMode === 'snapshot') { const r = computeKpi(u.id, t.kpiId, q.id, w.number - 1, { includeDraft: true }); const last = [...r.series].reverse().find(x => x.raw && x.raw.denominator != null); if (last) denPrev = last.raw.denominator; }
-    if (isLocalesKpi(kpi)) { p[t.kpiId] = { value: v && v.denominator != null ? v.denominator : '', numerator: '', denominator: '', comment: v ? v.comment || '' : '', breakdown: [], items: v ? localItemsOf(v.id).map(it => ({ kind: it.kind, referenceDate: it.referenceDate, installDays: it.installDays, note: it.note || '' })) : [] }; continue; }
+    if (isLocalesKpi(kpi)) { p[t.kpiId] = { value: v && v.denominator != null ? v.denominator : '', numerator: '', denominator: '', comment: v ? v.comment || '' : '', breakdown: [], items: v ? localItemsOf(v.id).map(it => ({ kind: it.kind, referenceDate: it.referenceDate, installDate: it.installDate || '', installDays: it.installDays, note: it.note || '' })) : [] }; continue; }
     if (isConjuntoKpi(kpi)) { const fv = parseFV(v ? v.detail : ''); p[t.kpiId] = { value: '', numerator: v && v.numerator != null ? v.numerator : '', denominator: '', comment: v ? v.comment || '' : '', breakdown: [], fijas: fv.fijas, variables: fv.variables }; continue; }
     if (isParadosKpi(kpi)) { const pend = w ? paradosPendientesPrevios(u.id, t.kpiId, q.id, w.number) : 0; const den = v && v.denominator != null ? v.denominator : ''; p[t.kpiId] = { value: '', numerator: v && v.numerator != null ? v.numerator : '', denominator: den, comment: v ? v.comment || '' : '', breakdown: [], pendPrev: pend, nuevos: den === '' ? '' : Math.max(0, Number(den) - pend) }; continue; }
     if (isListaKpi(kpi)) { p[t.kpiId] = { value: v && v.value != null ? v.value : '0', numerator: '', denominator: '', comment: v ? v.comment || '' : '', breakdown: [], detail: v && v.detail ? v.detail : '' }; continue; }
@@ -1432,9 +1436,10 @@ function captureKpiHTML(t, i, chains, val) {
       <div class="field"><label>Acumulado del trimestre</label><input value="${accD > 0 ? accN + ' de ' + accD + ' → ' + fmtPct(accN / accD * 100, 1) + ' · meta ' + fmtPct(t.target, 0) : '—'}" disabled></div></div>
       ${items.length ? `<div class="breakdown"><h4>Detalle por local</h4>
       ${items.map((it, j) => { const k = LOCAL_KINDS[it.kind]; const ok = it.installDays !== '' && it.installDays != null; const d = Number(it.installDays); return `<div class="loc-row ${ok ? (d <= 30 ? 'fast' : 'slow') : ''}"><div class="loc-head"><b>Local ${j + 1}</b>${ok ? (d <= 30 ? badge('b-verde', '≤ 30 días', 'check') : badge('b-rojo', '> 30 días', 'alert')) : badge('b-amar', 'Incompleto', 'alert')}</div>
-        <div class="fields c3"><div class="field"><label>Tipo de local</label><select ${ro} onchange="capLoc('${t.kpiId}',${j},'kind',this.value)"><option value="">— Elige —</option><option value="nuevo" ${it.kind === 'nuevo' ? 'selected' : ''}>Nuevo</option><option value="reacondicionado" ${it.kind === 'reacondicionado' ? 'selected' : ''}>Reacondicionado</option></select></div>
-        <div class="field"><label>${esc(k ? k.dateLabel : 'Fecha de referencia (elige primero el tipo)')}</label><input type="date" ${ro} ${k ? '' : 'disabled'} value="${esc(it.referenceDate || '')}" onchange="capLoc('${t.kpiId}',${j},'referenceDate',this.value)"></div>
-        <div class="field"><label>Días que tardó en instalarse</label><input type="text" inputmode="numeric" ${ro} value="${it.installDays ?? ''}" oninput="capLoc('${t.kpiId}',${j},'installDays',this.value)"></div></div></div>`; }).join('')}
+        <div class="fields c4"><div class="field"><label>Tipo de local</label><select ${ro} onchange="capLoc('${t.kpiId}',${j},'kind',this.value)"><option value="">— Elige —</option><option value="nuevo" ${it.kind === 'nuevo' ? 'selected' : ''}>Nuevo</option><option value="reacondicionado" ${it.kind === 'reacondicionado' ? 'selected' : ''}>Reacondicionado</option></select></div>
+        <div class="field"><label>${esc(k ? 'Inicio · ' + k.dateLabel : 'Fecha de inicio (elige primero el tipo)')}</label><input type="date" ${ro} ${k ? '' : 'disabled'} value="${esc(it.referenceDate || '')}" onchange="capLoc('${t.kpiId}',${j},'referenceDate',this.value)"></div>
+        <div class="field"><label>Fin · Fecha en que quedó instalado</label><input type="date" ${ro} ${k ? '' : 'disabled'} min="${esc(it.referenceDate || '')}" value="${esc(it.installDate || '')}" onchange="capLoc('${t.kpiId}',${j},'installDate',this.value)"></div>
+        <div class="field"><label>Días que tardó en instalarse</label><input type="text" inputmode="numeric" ${ro} ${it.installDate ? 'disabled' : ''} value="${it.installDays ?? ''}" placeholder="${it.installDate ? '' : 'o captura los días'}" oninput="capLoc('${t.kpiId}',${j},'installDays',this.value)"></div></div>${it.installDate && it.referenceDate && localDaysBetween(it.referenceDate, it.installDate) == null ? '<div class="small" style="color:var(--rojo,#C0392B)">La fecha de instalación no puede ser anterior a la de inicio.</div>' : ''}</div>`; }).join('')}
       </div>` : ''}
       <div class="note">${esc(kpi.formulaDescription)}</div>`;
   } else if (kpi.type === 'A') {
@@ -1530,8 +1535,8 @@ function capBd(kpiId, j, field, v) { CAP.payload[kpiId].breakdown[j][field] = fi
 function capBdAdd(kpiId) { CAP.payload[kpiId].breakdown.push({ chainId: '', quantity: '' }); capRefresh(); }
 function capBdRemove(kpiId, j) { CAP.payload[kpiId].breakdown.splice(j, 1); capRefresh(); }
 /* KPI Locales: el número de locales genera un renglón por cada uno */
-function capLocN(kpiId, v) { v = numClean(v); const p = CAP.payload[kpiId]; p.value = v; const n = Math.max(0, Math.min(200, Math.floor(Number(v) || 0))); p.items = p.items || []; while (p.items.length < n) p.items.push({ kind: '', referenceDate: '', installDays: '', note: '' }); if (p.items.length > n) p.items.length = n; capRefresh(); }
-function capLoc(kpiId, j, field, v) { CAP.payload[kpiId].items[j][field] = field === 'installDays' ? numClean(v) : v; capRefresh(); }
+function capLocN(kpiId, v) { v = numClean(v); const p = CAP.payload[kpiId]; p.value = v; const n = Math.max(0, Math.min(200, Math.floor(Number(v) || 0))); p.items = p.items || []; while (p.items.length < n) p.items.push({ kind: '', referenceDate: '', installDate: '', installDays: '', note: '' }); if (p.items.length > n) p.items.length = n; capRefresh(); }
+function capLoc(kpiId, j, field, v) { const it = CAP.payload[kpiId].items[j]; it[field] = field === 'installDays' ? numClean(v) : v; if (field === 'referenceDate' || field === 'installDate') { const d = localDaysBetween(it.referenceDate, it.installDate); if (it.installDate) it.installDays = d == null ? '' : String(d); } capRefresh(); }
 function submitCapture(mode, confirmed = false) {
   const val = validateCapture(CAP.u, CAP.w, CAP.payload, mode);
   if (!val.ok) { toast(val.errors[0], 'err'); capRefresh(); return; }
@@ -2196,7 +2201,7 @@ function kpiCsvRows(kpiId, qid, onlyUserId = null) {
       const expected = kpi.type === 'A' && r.meta > 0 ? (r.meta * w.number / all.length) / r.meta * 100 : (r.meta ? 100 : null);
       let detalle = '';
       if (v) {
-        if (isLocalesKpi(kpi)) detalle = localItemsOf(v.id).map(it => `${it.kind} ${it.referenceDate} ${it.installDays}d`).join(' | ');
+        if (isLocalesKpi(kpi)) detalle = localItemsOf(v.id).map(it => `${it.kind} ${it.referenceDate}${it.installDate ? '→' + it.installDate : ''} ${it.installDays}d`).join(' | ');
         else if (isListaKpi(kpi) || isConjuntoKpi(kpi)) detalle = v.detail ? listaLines(v.detail).join(' | ') : '';
         else detalle = breakdownsOf(v.id).map(b => `${nameOf('chains', b.chainId)}: ${fmtNum(b.quantity)}`).join(' | ');
       }
