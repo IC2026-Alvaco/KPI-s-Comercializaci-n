@@ -451,6 +451,12 @@ const hasOwnKpis = (u) => DB.user_kpi_targets.some(t => t.userId === u.id) || DB
 const isExec = (u) => roleOf(u).code === 'EJECUTIVO' || hasOwnKpis(u);
 function nameOf(col, id, fb = '—') { const x = byId(col, id); return x ? x.name : fb; }
 const execs = () => where('users', u => isExec(u) && u.active).sort((a, b) => a.name.localeCompare(b.name));
+/* Coordinador: no captura; ve como KPIs los TOTALES de los ejecutivos a su cargo (users.supervisorId) */
+const isCoord = (u) => !!u && roleOf(u).code === 'COORDINADOR';
+const teamOf = (coordId) => execs().filter(x => x.supervisorId === coordId);
+const coordOf = (u) => u && u.supervisorId ? byId('users', u.supervisorId) : null;
+/* Ejecutivos que puede ver quien está en sesión: todos (admin / directivo) o solo su equipo (coordinador) */
+function viewableExecs() { const me = currentUser(); return me && isCoord(me) ? teamOf(me.id) : execs(); }
 
 function refDate() { return DB.settings.simDate || todayISO(); }
 function activeQuarter() {
@@ -640,6 +646,7 @@ function breakdownRows(qidOrScope, filter = {}) {
     if (filter.weekId && w.id !== filter.weekId) continue;
     for (const s of where('weekly_submissions', s => s.weekId === w.id && COUNTED.includes(s.status))) {
       if (filter.userId && s.userId !== filter.userId) continue;
+      if (filter.userIds && !filter.userIds.has(s.userId)) continue;
       const u = byId('users', s.userId); if (!u) continue;
       if (filter.positionId && u.positionId !== filter.positionId) continue;
       if (filter.areaId && u.areaId !== filter.areaId) continue;
@@ -837,7 +844,7 @@ function seedDatabase() {
   const db = {
     version: 1,
     settings: { appName: 'Control Semanal de KPIs', company: 'ALVACO · Comercialización', defaultGreen: 100, defaultYellow: 70, simDate: '2026-10-21', weekMode: 'lun-vie', partialWeeks: 'excluir', reminderText: 'Tu actualización semanal de KPIs está pendiente.', dashboardTiles: ['k_rentvar', 'k_parados', 'k_loc'] },
-    roles: [{ id: 'r_admin', code: 'ADMIN', name: 'Administrador' }, { id: 'r_exec', code: 'EJECUTIVO', name: 'Ejecutivo' }, { id: 'r_dir', code: 'DIRECTIVO', name: 'Directivo' }],
+    roles: [{ id: 'r_admin', code: 'ADMIN', name: 'Administrador' }, { id: 'r_exec', code: 'EJECUTIVO', name: 'Ejecutivo' }, { id: 'r_dir', code: 'DIRECTIVO', name: 'Directivo' }, { id: 'r_coord', code: 'COORDINADOR', name: 'Coordinador' }],
     areas: [{ id: 'a_nte', name: 'Célula Norte' }, { id: 'a_cen', name: 'Célula Centro' }, { id: 'a_sur', name: 'Célula Sur-Sureste' }, { id: 'a_nac', name: 'Cuentas Nacionales' }, { id: 'a_ic', name: 'Inteligencia Comercial' }, { id: 'a_dir', name: 'Dirección Comercial' }],
     positions: [{ id: 'p_ecs', name: 'Ejecutivo Comercial Sr.' }, { id: 'p_ec', name: 'Ejecutivo Comercial' }, { id: 'p_kam', name: 'Key Account Manager' }, { id: 'p_ger', name: 'Gerente Regional' }, { id: 'p_coord', name: 'Coordinador de IC' }, { id: 'p_dir', name: 'Director Comercial' }],
     users: [], quarters: [], reporting_weeks: [], kpis: [], user_kpi_targets: [], chains: [], user_chain_assignments: [], chain_requests: [],
@@ -1122,6 +1129,7 @@ function buildExportSheets(qid) {
 /* ---------- Router & shell ---------- */
 const MENUS = {
   EJECUTIVO: [['inicio', 'Inicio', 'home'], ['avance', 'Mi avance', 'chart'], ['captura', 'Captura semanal', 'edit'], ['calendario', 'Calendario', 'cal'], ['historial', 'Historial', 'hist'], ['micopilot', 'Mis datos para Copilot', 'download']],
+  COORDINADOR: [['equipo', 'Mi equipo', 'chart'], ['ejecutivos', 'Mis ejecutivos', 'users'], ['kpis', 'KPIs del equipo', 'target'], ['cadenas', 'Cadenas', 'store'], ['historico', 'Histórico', 'hist'], ['copilot', 'Datos de mi equipo para Copilot', 'download']],
   DIRECTIVO: [['dashboard', 'Dashboard', 'chart'], ['ejecutivos', 'Ejecutivos', 'users'], ['kpis', 'KPIs', 'target'], ['cadenas', 'Cadenas', 'store'], ['historico', 'Histórico', 'hist'], ['copilot', 'Exportar para Copilot', 'download']],
   ADMIN: [['dashboard', 'Dashboard', 'chart'], ['usuarios', 'Usuarios', 'users'], ['kpis', 'KPIs', 'target'], ['metas', 'Metas', 'layers'], ['cadenas', 'Cadenas', 'store'], ['asignaciones', 'Asignaciones', 'link'], ['periodos', 'Periodos', 'cal'], ['semanas', 'Semanas', 'list'], ['parametros', 'Parámetros', 'settings'], ['auditoria', 'Auditoría', 'shield'], ['copilot', 'Exportar para Copilot', 'download']]
 };
@@ -1172,7 +1180,7 @@ function renderLogin() {
     <div class="login-right">
       <h2 class="brand-title" style="font-size:26px">Iniciar sesión</h2>
       <p class="muted small">Prototipo local: selecciona un usuario para entrar con su rol. En producción esta pantalla se sustituye por Supabase Auth (correo corporativo + contraseña / SSO).</p>
-      ${['ADMIN', 'DIRECTIVO', 'EJECUTIVO'].map(code => { const r = DB.roles.find(r => r.code === code); const list = us.filter(u => u.roleId === r.id); if (!list.length) return ''; return `<div class="eyebrow mt16" style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--txt2);font-weight:700">${r.name}</div><div class="user-pick">${list.map(u => `<button onclick="login('${u.id}')">${avatar(u)}<div><div style="font-weight:700">${esc(u.name)}</div><div class="small muted">${esc(nameOf('positions', u.positionId))} · ${esc(nameOf('areas', u.areaId))}</div></div></button>`).join('')}</div>`; }).join('')}
+      ${['ADMIN', 'DIRECTIVO', 'COORDINADOR', 'EJECUTIVO'].map(code => { const r = DB.roles.find(r => r.code === code); if (!r) return ''; const list = us.filter(u => u.roleId === r.id); if (!list.length) return ''; return `<div class="eyebrow mt16" style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--txt2);font-weight:700">${r.name}</div><div class="user-pick">${list.map(u => `<button onclick="login('${u.id}')">${avatar(u)}<div><div style="font-weight:700">${esc(u.name)}</div><div class="small muted">${esc(nameOf('positions', u.positionId))} · ${esc(nameOf('areas', u.areaId))}</div></div></button>`).join('')}</div>`; }).join('')}
       <div class="row mt24 small muted between"><span>Datos guardados en este navegador.</span><span><button class="btn ghost sm" onclick="exportJSON()">${ICONS.download}Respaldar JSON</button> <button class="btn ghost sm" onclick="importJSONPrompt()">Restaurar</button> <button class="btn danger sm" onclick="confirmDlg('Reiniciar datos','Se restaurará la semilla de ejemplo y se perderán los cambios locales.',()=>{resetDB();render();toast('Datos reiniciados','ok')},'Reiniciar',true)">Reiniciar demo</button></span></div>
     </div></div></div>`;
 }
@@ -1570,7 +1578,7 @@ function biInit(q, cw) {
 function biScope() { return BI.mode === 'mensual' ? { type: 'mensual', qid: BI.qid, month: BI.month } : BI.mode === 'anual' ? { type: 'anual', year: BI.year } : { type: 'trimestral', qid: BI.qid, upto: BI.upto }; }
 function biSet(k, v) { BI[k] = v; if (k === 'qid') { const q = byId('quarters', v); BI.upto = (currentWeek(q.id) || {}).number || null; BI.month = null; BI.year = Number(q.startDate.slice(0, 4)); } render(); }
 function biFiltersHTML(q) {
-  const weeks = weeksOf(BI.qid); const ex = execs();
+  const weeks = weeksOf(BI.qid); const ex = viewableExecs();
   const opt = (arr, val, fn) => arr.map(x => `<option value="${x.id}" ${val === x.id ? 'selected' : ''}>${esc(fn(x))}</option>`).join('');
   const years = [...new Set(DB.quarters.map(x => Number(x.startDate.slice(0, 4))))].sort();
   const modeBtn = (m, l) => `<button class="btn ${BI.mode === m ? 'mor' : 'ghost'} sm" onclick="biSet('mode','${m}')">${l}</button>`;
@@ -1589,14 +1597,14 @@ function biFiltersHTML(q) {
   </div>`;
 }
 function biChips() { const sc = biScope(); return [[esc(scopeLabel(sc)), 'm'], [BI.mode === 'anual' ? 'Vista anual' : BI.mode === 'mensual' ? 'Vista mensual' : 'Vista trimestral']]; }
-function biUsers() { return execs().filter(u => (!BI.userId || u.id === BI.userId) && (!BI.positionId || u.positionId === BI.positionId) && (!BI.areaId || u.areaId === BI.areaId)); }
+function biUsers() { return viewableExecs().filter(u => (!BI.userId || u.id === BI.userId) && (!BI.positionId || u.positionId === BI.positionId) && (!BI.areaId || u.areaId === BI.areaId)); }
 function biData() {
   const scope = biScope(); const users = biUsers();
   const cus = users.map(u => computeUserScope(u.id, scope));
   let allK = cus.flatMap(c => c.kpis.map(k => ({ ...k, user: c.user })));
   let allAnnual = cus.flatMap(c => c.annual.map(k => ({ ...k, user: c.user })));
   if (BI.kpiId) { allK = allK.filter(k => k.kpi.id === BI.kpiId); allAnnual = allAnnual.filter(k => k.kpi.id === BI.kpiId); }
-  const rows = breakdownRows(scope, { userId: BI.userId || null, positionId: BI.positionId || null, areaId: BI.areaId || null, kpiId: BI.kpiId || null, chainId: BI.chainId || null });
+  const rows = breakdownRows(scope, { userId: BI.userId || null, userIds: isCoord(currentUser()) ? new Set(users.map(x => x.id)) : null, positionId: BI.positionId || null, areaId: BI.areaId || null, kpiId: BI.kpiId || null, chainId: BI.chainId || null });
   const weighted = cus.filter(c => c.weighted != null); const avgW = weighted.length ? weighted.reduce((a, c) => a + c.weighted, 0) / weighted.length : null;
   const aw = cus.filter(c => c.annualWeighted != null); const avgAW = aw.length ? aw.reduce((a, c) => a + c.annualWeighted, 0) / aw.length : null;
   const pcts = [...allK, ...allAnnual].filter(k => k.pct != null); const avgK = pcts.length ? pcts.reduce((a, k) => a + k.pct, 0) / pcts.length : null;
@@ -1776,6 +1784,80 @@ function historicoHTML(u, q, cw) {
 VIEWS['DIRECTIVO:historico'] = historicoHTML;
 
 /* =====================================================================
+   MÓDULO COORDINADOR — "Mi equipo": totales de los ejecutivos a su cargo (solo consulta)
+   ===================================================================== */
+/* Total del equipo por KPI: acumulativos (A) = Σ avance / Σ meta; ratios (B/C) = Σ numeradores / Σ denominadores
+   de los ejecutivos (si no hay cifras base, promedio de sus porcentajes) */
+function teamKpiTotals(d) {
+  const all = [...d.allK, ...d.allAnnual].filter(k => !isCorporativoKpi(k.kpi)); /* el corporativo ya se muestra arriba como dato de la compañía */
+  const kpis = [...new Map(all.map(k => [k.kpi.id, k.kpi])).values()];
+  return kpis.map(kp => {
+    const list = all.filter(k => k.kpi.id === kp.id); const n = list.length;
+    const metaSum = list.reduce((a, k) => a + (k.meta || 0), 0), avSum = list.reduce((a, k) => a + (k.current || 0), 0);
+    const withVal = list.filter(k => k.current != null); const avgVal = withVal.length ? withVal.reduce((a, k) => a + k.current, 0) / withVal.length : null;
+    const metas = list.filter(k => k.meta != null); const avgMeta = metas.length ? metas.reduce((a, k) => a + k.meta, 0) / metas.length : null;
+    let num = 0, den = 0, anyRatio = false;
+    if (kp.type !== 'A' && !isConjuntoKpi(kp) && !isParadosKpi(kp) && !isCorporativoKpi(kp)) {
+      for (const k of list) {
+        if (k.periodType === 'anual') { const e = k.last; if (e && e.denominator > 0) { num += Number(e.numerator) || 0; den += Number(e.denominator) || 0; anyRatio = true; } continue; }
+        const raws = (k.series || []).filter(s => s.raw && s.raw.denominator != null).map(s => s.raw); if (!raws.length) continue;
+        const last = raws[raws.length - 1];
+        const nn = (kp.type === 'B' || kp.numeratorMode === 'snapshot') ? Number(last.numerator) || 0 : raws.reduce((a, r) => a + (Number(r.numerator) || 0), 0);
+        const dd = (kp.type === 'C' && kp.denominatorMode === 'acumulado') ? raws.reduce((a, r) => a + (Number(r.denominator) || 0), 0) : Number(last.denominator) || 0;
+        if (dd > 0 || nn > 0) { num += nn; den += dd; anyRatio = true; }
+      }
+    }
+    let current, pct, label;
+    if (kp.type === 'A') { current = avSum; pct = metaSum ? avSum / metaSum * 100 : null; label = `${fmtNum(avSum)} de ${fmtNum(metaSum)} ${esc(kp.unit || '')}`; }
+    else if (anyRatio && den > 0) { current = num / den * 100; pct = pctOf(kp, avgMeta, current); label = `${fmtNum(num)} / ${fmtNum(den)} · ${fmtPct(current)} (meta ${fmtPct(avgMeta, 0)})`; }
+    else { current = avgVal; pct = pctOf(kp, avgMeta, avgVal); label = `${fmtPct(avgVal)} promedio del equipo (meta ${fmtPct(avgMeta, 0)})`; }
+    return { kpi: kp, list, n, metaSum, avSum, avgVal, avgMeta, num, den, anyRatio, current, pct, sem: semaforo(pct, globalThr()), label };
+  });
+}
+function teamDashboardHTML(u, q, cw) {
+  biInit(q, cw); const d = biData(); const qq = byId('quarters', BI.qid);
+  const team = teamOf(u.id); const tot = teamKpiTotals(d);
+  const pendientes = d.users.filter(x => !d.reportedNow.includes(x));
+  const okN = tot.filter(t => t.sem.code === 'verde').length, warnN = tot.filter(t => t.sem.code === 'amarillo').length, badN = tot.filter(t => ['rojo', 'gris'].includes(t.sem.code)).length;
+  const avgTeam = (() => { const p = tot.filter(t => t.pct != null); return p.length ? p.reduce((a, t) => a + t.pct, 0) / p.length : null; })();
+  const sub = team.length ? `Totales de ${team.length} ejecutivo(s) a tu cargo: ${team.map(x => esc(x.name.split(' ')[0])).join(', ')}. ${esc(scopeLabel(d.scope))}. Haz clic en un ejecutivo para ver su detalle.` : 'Aún no tienes ejecutivos asignados; pide a Inteligencia Comercial que los relacione contigo en Usuarios.';
+  const html = topbar('Mi equipo', sub, biChips()) + corporativoCardHTML(u) + biFiltersHTML(qq) +
+    `<div class="grid g4">
+      <div class="card kpi-tile acc-m"><div class="eyebrow">Avance general del equipo</div><div class="big m">${fmtPct(avgTeam)}</div><div class="delta">Promedio de cumplimiento de los KPIs del equipo · pond. trim. ${fmtPct(d.avgW, 0)}</div></div>
+      <div class="card kpi-tile acc-g"><div class="eyebrow">KPIs cumplidos</div><div class="big">${okN}<span class="small muted" style="font-size:14px"> / ${tot.length}</span></div><div class="delta">${warnN} en proceso · ${badN} pendientes</div></div>
+      <div class="card kpi-tile acc-c"><div class="eyebrow">Ejecutivos a cargo</div><div class="big">${team.length}</div><div class="delta">${d.reportedNow.length} ya reportaron la semana ${d.lastWeek ? d.lastWeek.number : ''}</div></div>
+      <div class="card kpi-tile acc-y"><div class="eyebrow">Pendientes de reportar</div><div class="big">${pendientes.length}</div><div class="delta">${pendientes.map(p => esc(p.name.split(' ')[0])).join(', ') || 'Nadie pendiente'}</div></div>
+    </div>
+    <div class="tbl-title mt24"><h3>Totales por KPI</h3><span class="small muted">Acumulativos = suma de avances y metas del equipo · porcentajes = cifras base sumadas (o promedio) · clic en un KPI para ver quién aporta qué</span></div>
+    <div class="grid g3">${tot.map(t => `<div class="card kpi-tile ${{ verde: 'acc-v', amarillo: 'acc-y', rojo: 'acc-r', gris: '' }[t.sem.code]}" style="cursor:pointer" onclick="openTeamKpi('${t.kpi.id}')"><div class="eyebrow">${esc(t.kpi.name)} ${t.kpi.periodicity === 'anual' ? '<span class="badge b-mor">Anual</span>' : ''}</div><div class="big">${t.kpi.type === 'A' ? `${fmtNum(t.avSum)}<span class="small muted" style="font-size:14px"> / ${fmtNum(t.metaSum)}</span>` : `${fmtPct(t.current)}<span class="small muted" style="font-size:14px"> · meta ${fmtPct(t.avgMeta, 0)}</span>`}</div>${progressBar(t.pct, t.sem)}<div class="delta">${fmtPct(t.pct)} de cumplimiento · ${t.n} ejecutivo(s)${t.kpi.direction === 'menor' ? ' · menor es mejor' : ''}</div></div>`).join('') || '<div class="card"><p class="muted">Sin KPIs en el periodo.</p></div>'}</div>
+    <div class="grid g2 mt16">
+      ${chartBox('t_exec', 'Cumplimiento ponderado por ejecutivo', 'Trimestral (%) · clic en la barra para ver detalle')}
+      ${chartBox('t_kpi', 'Cumplimiento por KPI (equipo)', 'Total del equipo por KPI')}
+    </div>
+    <div class="tbl-title mt24"><h3>Matriz de semáforo de mi equipo</h3><span class="small muted">Verde ≥ ${DB.settings.defaultGreen}% · Amarillo ≥ ${DB.settings.defaultYellow}%</span></div>
+    ${semMatrixHTML(d)}`;
+  window.__afterRender = () => {
+    const cusS = [...d.cus].sort((a, b) => (b.weighted || 0) - (a.weighted || 0));
+    mkChart('t_exec', { type: 'bar', data: { labels: cusS.map(c => c.user.name), datasets: [{ data: cusS.map(c => c.weighted == null ? 0 : Math.min(100, +c.weighted.toFixed(1))), backgroundColor: cusS.map(c => SEM_COLORS[c.sem.code]), borderRadius: 4, barThickness: 22, real: cusS.map(c => c.weighted), ids: cusS.map(c => c.userId) }] }, options: baseOpts({ indexAxis: 'y', scales: { x: { max: 100, grid: { color: '#EEF1F7' }, ticks: { callback: v => v + '%' } }, y: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => 'Ponderado real: ' + fmtPct(c.dataset.real[c.dataIndex]) } } }, onClick: (e, els, ch) => { if (els.length) openExecDetail(ch.data.datasets[0].ids[els[0].index]); } }) }, [['Ejecutivo', 'Ponderado'], ...cusS.map(c => [c.user.name, fmtPct(c.weighted)])]);
+    mkChart('t_kpi', { type: 'bar', data: { labels: tot.map(t => t.kpi.name), datasets: [{ data: tot.map(t => t.pct == null ? 0 : Math.min(100, +t.pct.toFixed(1))), backgroundColor: tot.map(t => SEM_COLORS[t.sem.code]), borderRadius: 4, barThickness: 26, real: tot.map(t => t.pct), ids: tot.map(t => t.kpi.id) }] }, options: baseOpts({ scales: { y: { max: 100, grid: { color: '#EEF1F7' }, ticks: { callback: v => v + '%' } }, x: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => 'Cumplimiento del equipo: ' + fmtPct(c.dataset.real[c.dataIndex]) } } }, onClick: (e, els, ch) => { if (els.length) openTeamKpi(ch.data.datasets[0].ids[els[0].index]); } }) }, [['KPI', '% equipo'], ...tot.map(t => [t.kpi.name, fmtPct(t.pct)])]);
+  };
+  return html;
+}
+/* Detalle de un KPI del equipo: quién aporta qué al total */
+function openTeamKpi(kpiId) {
+  const d = biData(); const t = teamKpiTotals(d).find(x => x.kpi.id === kpiId); if (!t) return;
+  const rows = [...t.list].sort((a, b) => (b.pct || 0) - (a.pct || 0));
+  openModal(`${esc(t.kpi.name)} · total del equipo`, `<div class="grid g3 mb16"><div class="card kpi-tile"><div class="eyebrow">Total del equipo</div><div class="big">${t.kpi.type === 'A' ? fmtNum(t.avSum) : fmtPct(t.current)}</div><div class="delta">${t.label}</div></div><div class="card kpi-tile acc-m"><div class="eyebrow">Cumplimiento</div><div class="big m">${fmtPct(t.pct)}</div><div class="delta">${semBadge(t.sem)}</div></div><div class="card kpi-tile acc-c"><div class="eyebrow">Ejecutivos</div><div class="big">${t.n}</div><div class="delta">${esc(t.kpi.formulaDescription || '')}</div></div></div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ejecutivo</th><th class="num">Avance</th><th class="num">Meta</th><th class="num">% del total</th><th class="num">Cumplimiento</th><th></th></tr></thead><tbody>${rows.map(k => `<tr class="click" onclick="closeModal();openExecDetail('${k.user.id}')"><td>${avatar(k.user)} <b>${esc(k.user.name)}</b><div class="small muted">${esc(nameOf('positions', k.user.positionId))}</div></td><td class="num"><b>${kpiValueText(k)}</b></td><td class="num">${kpiTargetText(k)}</td><td class="num">${t.kpi.type === 'A' && t.avSum ? fmtPct((k.current || 0) / t.avSum * 100, 0) : '—'}</td><td class="num">${fmtPct(k.pct)}</td><td>${semCell(k.sem)}</td></tr>`).join('')}</tbody></table></div>`,
+    `<button class="btn ghost" onclick="closeModal()">Cerrar</button>`, { wide: true });
+}
+VIEWS['COORDINADOR:equipo'] = teamDashboardHTML;
+VIEWS['COORDINADOR:ejecutivos'] = (u, q, cw) => execsListHTML(u, q, cw, 'Mis ejecutivos');
+VIEWS['COORDINADOR:kpis'] = (u, q, cw) => kpisBIHTML(u, q, cw, 'KPIs del equipo');
+VIEWS['COORDINADOR:cadenas'] = (u, q, cw) => chainsBIHTML(u, q, cw, 'Cadenas de mi equipo');
+VIEWS['COORDINADOR:historico'] = historicoHTML;
+
+/* =====================================================================
    MÓDULO ADMINISTRADOR
    ===================================================================== */
 function formField(label, inner) { return `<div class="field"><label>${label}</label>${inner}</div>`; }
@@ -1784,21 +1866,21 @@ const $v = (id) => { const el = document.getElementById(id); return el ? (el.typ
 
 /* ---------- USUARIOS ---------- */
 VIEWS['ADMIN:usuarios'] = (u, q) => {
-  const rows = DB.users.map(x => `<tr class="${x.active ? '' : 'muted'}"><td>${avatar(x)} <b>${esc(x.name)}</b><div class="small muted">${esc(x.email)}</div></td><td>${badge(roleOf(x).code === 'ADMIN' ? 'b-mor' : roleOf(x).code === 'DIRECTIVO' ? 'b-cel' : 'b-azul', roleOf(x).name)}</td><td>${esc(nameOf('positions', x.positionId))}</td><td>${esc(nameOf('areas', x.areaId))}</td><td class="num">${isExec(x) ? targetsOf(x.id, q.id).length : '—'}</td><td class="num">${isExec(x) ? chainsOf(x.id).length : '—'}</td><td>${x.active ? badge('b-verde', 'Activo', 'check') : badge('b-gris', 'Inactivo')}${(typeof SB !== 'undefined' && SB && !x.authUserId) ? ' ' + badge('b-amar', 'Sin acceso aún', 'alert') : ''}</td><td><button class="iconbtn" onclick="userDlg('${x.id}')" title="Editar">${ICONS.edit}</button> <button class="iconbtn" onclick="toggleUser('${x.id}')" title="${x.active ? 'Desactivar' : 'Activar'}">${x.active ? ICONS.lock : ICONS.unlock}</button></td></tr>`).join('');
+  const rows = DB.users.map(x => `<tr class="${x.active ? '' : 'muted'}"><td>${avatar(x)} <b>${esc(x.name)}</b><div class="small muted">${esc(x.email)}</div></td><td>${badge(roleOf(x).code === 'ADMIN' ? 'b-mor' : roleOf(x).code === 'DIRECTIVO' ? 'b-cel' : roleOf(x).code === 'COORDINADOR' ? 'b-verde' : 'b-azul', roleOf(x).name)}</td><td>${esc(nameOf('positions', x.positionId))}${coordOf(x) ? `<div class="small muted">Reporta a ${esc(coordOf(x).name.split(' ').slice(0, 2).join(' '))}</div>` : ''}${isCoord(x) ? `<div class="small muted">Coordina a ${teamOf(x.id).length} ejecutivo(s)</div>` : ''}</td><td>${esc(nameOf('areas', x.areaId))}</td><td class="num">${isExec(x) ? targetsOf(x.id, q.id).length : '—'}</td><td class="num">${isExec(x) ? chainsOf(x.id).length : '—'}</td><td>${x.active ? badge('b-verde', 'Activo', 'check') : badge('b-gris', 'Inactivo')}${(typeof SB !== 'undefined' && SB && !x.authUserId) ? ' ' + badge('b-amar', 'Sin acceso aún', 'alert') : ''}</td><td><button class="iconbtn" onclick="userDlg('${x.id}')" title="Editar">${ICONS.edit}</button> <button class="iconbtn" onclick="toggleUser('${x.id}')" title="${x.active ? 'Desactivar' : 'Activar'}">${x.active ? ICONS.lock : ICONS.unlock}</button></td></tr>`).join('');
   return topbar('Usuarios', 'Alta, edición, roles y activación de usuarios. Los ejecutivos inactivos no aparecen en dashboards ni reciben recordatorios.', [[DB.users.length + ' usuarios']]) +
     `<div class="row between mb8"><div class="row"><button class="btn" onclick="userDlg()">${ICONS.plus}Nuevo usuario</button><button class="btn ghost" onclick="catalogDlg('positions','Puestos')">${ICONS.list}Puestos</button><button class="btn ghost" onclick="catalogDlg('areas','Áreas / células')">${ICONS.list}Áreas / células</button></div></div>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Usuario</th><th>Rol</th><th>Puesto</th><th>Área / célula</th><th class="num">KPIs</th><th class="num">Cadenas</th><th>Estado</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
 };
 function userDlg(id) {
   const x = id ? byId('users', id) : { name: '', email: '', roleId: (DB.roles.find(r => r.code === 'EJECUTIVO') || DB.roles[0]).id, areaId: DB.areas[0].id, positionId: DB.positions[0].id, active: true };
-  openModal(id ? 'Editar usuario' : 'Nuevo usuario', `<div class="fields">${formField('Nombre completo', `<input id="f_name" value="${esc(x.name)}">`)}${formField('Correo corporativo', `<input id="f_email" value="${esc(x.email)}">`)}${formField('Rol', selectHTML('f_role', DB.roles, x.roleId, r => r.name))}${formField('Puesto', selectHTML('f_pos', DB.positions, x.positionId, r => r.name))}${formField('Área / célula', selectHTML('f_area', DB.areas, x.areaId, r => r.name))}</div><div class="msg info">${ICONS.info}${id ? (x.authUserId ? `Acceso activo. La persona entra con su correo y su contraseña (inicial <b>${INITIAL_PASSWORD}</b>).` : `<b>Sin acceso aún.</b> Actívalo con el botón de abajo; entrará con su correo y la contraseña <b>${INITIAL_PASSWORD}</b>.`) : `Al guardar se activa su acceso automáticamente: entrará con este correo y la contraseña inicial <b>${INITIAL_PASSWORD}</b>.`}</div>${id ? `<div class="row mt8"><button class="btn sec sm" onclick="sbProvision('${id}', ${x.authUserId ? 'true' : 'false'})">${ICONS.unlock}${x.authUserId ? 'Restablecer contraseña a ' + INITIAL_PASSWORD : 'Activar acceso'}</button></div>` : ''}`,
+  openModal(id ? 'Editar usuario' : 'Nuevo usuario', `<div class="fields">${formField('Nombre completo', `<input id="f_name" value="${esc(x.name)}">`)}${formField('Correo corporativo', `<input id="f_email" value="${esc(x.email)}">`)}${formField('Rol', selectHTML('f_role', DB.roles, x.roleId, r => r.name))}${formField('Puesto', selectHTML('f_pos', DB.positions, x.positionId, r => r.name))}${formField('Área / célula', selectHTML('f_area', DB.areas, x.areaId, r => r.name))}${formField('Reporta a (coordinador)', `<select id="f_sup"><option value="">— Nadie —</option>${DB.users.filter(c => c.active && isCoord(c) && c.id !== id).map(c => `<option value="${c.id}" ${x.supervisorId === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>`)}</div><div class="small muted" style="margin:-6px 0 10px">Rol <b>Coordinador</b>: no captura semana; ve en “Mi equipo” los totales de los ejecutivos que le reportan.</div><div class="msg info">${ICONS.info}${id ? (x.authUserId ? `Acceso activo. La persona entra con su correo y su contraseña (inicial <b>${INITIAL_PASSWORD}</b>).` : `<b>Sin acceso aún.</b> Actívalo con el botón de abajo; entrará con su correo y la contraseña <b>${INITIAL_PASSWORD}</b>.`) : `Al guardar se activa su acceso automáticamente: entrará con este correo y la contraseña inicial <b>${INITIAL_PASSWORD}</b>.`}</div>${id ? `<div class="row mt8"><button class="btn sec sm" onclick="sbProvision('${id}', ${x.authUserId ? 'true' : 'false'})">${ICONS.unlock}${x.authUserId ? 'Restablecer contraseña a ' + INITIAL_PASSWORD : 'Activar acceso'}</button></div>` : ''}`,
     `<button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" onclick="saveUser('${id || ''}')">${ICONS.save}Guardar</button>`);
 }
 function saveUser(id) {
   const name = $v('f_name').trim(), email = $v('f_email').trim(); if (!name || !email) { toast('Nombre y correo son obligatorios', 'err'); return; }
   if (DB.users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.id !== id)) { toast('Ya existe un usuario con ese correo', 'err'); return; }
   if (typeof emailAllowed === 'function' && !emailAllowed(email)) { toast('El correo debe ser @' + ALLOWED_DOMAIN + ' o de un dominio autorizado (' + ALLOWED_DOMAINS.join(', ') + ')', 'err'); return; }
-  const data = { name, email, roleId: $v('f_role'), positionId: $v('f_pos'), areaId: $v('f_area') };
+  const data = { name, email, roleId: $v('f_role'), positionId: $v('f_pos'), areaId: $v('f_area'), supervisorId: $v('f_sup') || null };
   let newId = null;
   if (id) { const u = byId('users', id); for (const k in data) if (u[k] !== data[k]) { audit('users', id, 'editar', k, k === 'password' ? '••••' : u[k], k === 'password' ? '••••' : data[k]); u[k] = data[k]; } }
   else { const u = { id: uid('u'), ...data, active: true, createdAt: nowISO() }; DB.users.push(u); audit('users', u.id, 'crear', 'name', null, name); newId = u.id; }
@@ -2008,11 +2090,40 @@ VIEWS['ADMIN:parametros'] = (u, q) => {
       <div class="card acc-g"><h3>Tarjetas del dashboard directivo</h3><p class="small muted">Las tarjetas fijas son Avance comercial general, Instalaciones y Clientes nuevos. Elige los 3 KPIs (trimestrales o anuales) de las tarjetas configurables.</p>${[0, 1, 2].map(i => formField('Tarjeta ' + (i + 4), `<select id="p_tile${i}">${DB.kpis.filter(k => k.active).map(k => `<option value="${k.id}" ${(s.dashboardTiles || [])[i] === k.id ? 'selected' : ''}>${esc(k.name)}${k.periodicity === 'anual' ? ' (anual)' : ''}</option>`).join('')}</select>`)).join('')}</div>
       <div class="card acc-v"><h3>Rentas por pagar (dato global de Inteligencia Comercial)</h3><p class="small muted">Rentas que debe pagar toda la compañía cada mes. El KPI "Rentas Pagadas" compara la suma de lo que capturan todos los ejecutivos contra este total × los meses del trimestre.</p><div class="fields">${formField('Rentas FIJAS al mes (incluye bodegas)', `<input id="p_rfij" type="number" min="0" value="${s.rentasMesFijas ?? 0}">`)}${formField('Rentas VARIABLES al mes', `<input id="p_rvar" type="number" min="0" value="${s.rentasMesVariables ?? 0}">`)}</div><div class="small muted">Total al mes: <b>${fmtNum((Number(s.rentasMesFijas) || 0) + (Number(s.rentasMesVariables) || 0))}</b> · Trimestre (× ${q ? monthsOfQuarter(q.id).length : 3} meses): <b>${fmtNum(((Number(s.rentasMesFijas) || 0) + (Number(s.rentasMesVariables) || 0)) * (q ? monthsOfQuarter(q.id).length : 3))}</b></div></div>
       <div class="card acc-g"><h3>KPIs corporativos (Meta anual corporativa)</h3><p class="small muted">Correo de la persona que puede actualizar el avance de los KPIs en modo corporativo. Los demás solo lo ven. Varios correos separados por coma.</p>${formField('Responsable de actualizar', `<input id="p_corp" value="${esc(s.kpiCorporativoEditor || '')}" placeholder="liliana.rincon@alvaco.com.mx">`)}</div>
+      <div class="card acc-r"><h3>Respaldo completo de la base</h3><p class="small muted">Descarga TODO lo guardado en Supabase (usuarios, KPIs, metas, cadenas, asignaciones, capturas semanales con desgloses y locales, bitácora anual, comentarios, parámetros y auditoría). Hazlo antes de aplicar cualquier cambio en la base. El JSON sirve para restaurar (con el script <b>restaurar_respaldo.py</b>); el Excel es para consultar.</p><div class="row"><button class="btn" onclick="backupJSON()">${ICONS.download}Respaldo completo (JSON)</button><button class="btn sec" onclick="backupExcel()">${ICONS.download}Respaldo en Excel (una hoja por tabla)</button></div><p class="small muted mt8" id="bkInfo">${backupSummary()}</p></div>
       <div class="card acc-o"><h3>Fecha de referencia (opcional)</h3><p class="small muted">Define qué semana se considera "actual". Déjala vacía para usar la fecha real del equipo (hoy: ${fmtDate(todayISO())}). Útil para probar el flujo de semanas.</p>${formField('Fecha de referencia', `<input id="p_sim" type="date" value="${s.simDate || ''}">`)}<button class="btn ghost sm" onclick="document.getElementById('p_sim').value=''">Usar fecha real</button></div>
     </div>
     <div class="row mt16"><button class="btn" onclick="saveSettings()">${ICONS.save}Guardar parámetros</button><button class="btn sec" onclick="exportWorkbook(buildExportSheets('${q.id}'),'KPIs_${esc(q.code).replace(/\s/g, '_')}.xlsx')">${ICONS.download}Exportar periodo actual a Excel</button><button class="btn ghost" onclick="exportJSON()">${ICONS.download}Descargar copia (JSON)</button></div>
     <div class="conclusion mt24">Configuración → Trimestre → Semana → Ejecutivo → Captura KPI → Desglose por cadena → Validación → Envío → Cálculo acumulado → Semáforo → Dashboard BI</div>`;
 };
+/* ---------- RESPALDO COMPLETO (todas las tablas, tal cual están en la base) ---------- */
+const BACKUP_TABLES = ['roles', 'areas', 'positions', 'users', 'quarters', 'reporting_weeks', 'kpis', 'user_kpi_targets', 'chains', 'user_chain_assignments', 'chain_requests', 'weekly_submissions', 'weekly_kpi_values', 'kpi_chain_breakdowns', 'kpi_local_items', 'annual_kpi_entries', 'comments'];
+const snakeRow = (t, r) => (typeof rowToDb === 'function' ? rowToDb(t, r) : r);
+function backupSummary() { const n = (t) => (DB[t] || []).length; return `Ahora mismo: ${n('users')} usuarios · ${n('weekly_submissions')} capturas semanales · ${n('weekly_kpi_values')} valores · ${n('kpi_chain_breakdowns')} desgloses · ${n('kpi_local_items')} locales · ${n('annual_kpi_entries')} registros anuales · ${n('user_chain_assignments')} asignaciones · ${n('audit_logs')} líneas de auditoría.`; }
+function backupObject() {
+  const out = { respaldo: 'Control Semanal de KPIs · ALVACO', fecha: nowISO(), generado_por: (currentUser() || {}).email || '', tablas: {} };
+  for (const t of BACKUP_TABLES) out.tablas[t] = (DB[t] || []).map(r => snakeRow(t, r));
+  out.tablas.settings = Object.keys(DB.settings || {}).map(k => ({ key: toSnake(k), value: { value: DB.settings[k] } }));
+  out.tablas.audit_logs = (DB.audit_logs || []).map(a => ({ id: a.id, ts: a.ts, user_id: a.userId, entity: a.entity, entity_id: a.entityId, action: a.action, field: a.field, old_value: a.oldValue, new_value: a.newValue }));
+  return out;
+}
+function backupJSON() {
+  const o = backupObject(); const blob = new Blob([JSON.stringify(o, null, 1)], { type: 'application/json;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Respaldo_KPIs_ALVACO_${todayISO()}_${new Date().toTimeString().slice(0, 5).replace(':', '')}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast('Respaldo JSON descargado: ' + backupSummary(), 'ok');
+}
+function backupExcel() {
+  const o = backupObject(); const sheets = [];
+  // hoja legible de capturas
+  const leg = [['Periodo', 'Semana', 'Inicio', 'Fin', 'Ejecutivo', 'Correo', 'KPI', 'Código', 'Estado', 'Valor', 'Numerador', 'Denominador', 'Detalle', 'Desglose por cadena', 'Enviado']];
+  for (const s of DB.weekly_submissions) { const u = byId('users', s.userId); const w = byId('reporting_weeks', s.weekId); if (!u || !w) continue; const q = byId('quarters', w.quarterId); for (const v of valuesOf(s.id)) { const k = byId('kpis', v.kpiId); leg.push([q ? q.name : '', w.number, w.startDate, w.endDate, u.name, u.email, k ? k.name : v.kpiId, k ? k.code : '', s.status, v.value ?? '', v.numerator ?? '', v.denominator ?? '', v.detail || '', breakdownsOf(v.id).map(b => nameOf('chains', b.chainId) + ': ' + b.quantity).join(' | '), s.submittedAt || '']); } }
+  sheets.push({ name: 'Capturas (legible)', rows: leg });
+  const an = [['Año', 'Ejecutivo', 'KPI', 'Fecha', 'Valor', 'Numerador', 'Denominador', 'Detalle', 'Comentario', 'Registró']];
+  for (const e of DB.annual_kpi_entries) an.push([e.year, nameOf('users', e.userId), nameOf('kpis', e.kpiId), e.ts, e.value ?? '', e.numerator ?? '', e.denominator ?? '', e.detail || '', e.comment || '', nameOf('users', e.createdBy, '')]);
+  sheets.push({ name: 'Anuales (legible)', rows: an });
+  for (const t in o.tablas) { const rows = o.tablas[t]; const cols = [...new Set(rows.flatMap(r => Object.keys(r)))]; sheets.push({ name: t, rows: [cols, ...rows.map(r => cols.map(c => { const v = r[c]; return v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : v; }))] }); }
+  exportWorkbook(sheets, `Respaldo_KPIs_ALVACO_${todayISO()}.xlsx`);
+}
 function saveSettings() {
   const g = Number($v('p_green')), y = Number($v('p_yellow')); if (!(y < g)) { toast('El umbral amarillo debe ser menor que el verde', 'err'); return; }
   const n = { defaultGreen: g, defaultYellow: y, weekMode: $v('p_mode'), partialWeeks: $v('p_partial'), appName: $v('p_app').trim(), company: $v('p_company').trim(), reminderText: $v('p_rem').trim(), simDate: $v('p_sim') || null, dashboardTiles: [$v('p_tile0'), $v('p_tile1'), $v('p_tile2')], rentasMesFijas: Number($v('p_rfij')) || 0, rentasMesVariables: Number($v('p_rvar')) || 0, kpiCorporativoEditor: $v('p_corp').trim().toLowerCase() };
@@ -2053,7 +2164,7 @@ const CSV_HEADER = ['kpi_codigo', 'kpi_nombre', 'kpi_tipo', 'periodicidad', 'uni
 
 function kpiCsvRows(kpiId, qid, onlyUserId = null) {
   const kpi = byId('kpis', kpiId); const rows = [CSV_HEADER]; const q = byId('quarters', qid); const ref = refDate();
-  const users = DB.users.filter(u => u.active && roleOf(u).code !== 'DIRECTIVO' && (!onlyUserId || u.id === onlyUserId)).sort((a, b) => a.name.localeCompare(b.name));
+  const me = currentUser(); const users = DB.users.filter(u => u.active && !['DIRECTIVO', 'COORDINADOR'].includes(roleOf(u).code) && (!onlyUserId || u.id === onlyUserId) && (!isCoord(me) || u.supervisorId === me.id)).sort((a, b) => a.name.localeCompare(b.name));
   const base = (u) => [kpi.code, kpi.name, kpi.type, kpi.periodicity, kpi.unit, kpi.captureMode || 'normal'];
   const who = (u) => [u.name, u.email, nameOf('positions', u.positionId, ''), nameOf('areas', u.areaId, '')];
   if (kpi.periodicity === 'anual') {
@@ -2144,9 +2255,9 @@ function downloadSelection(qid, userId, tag) {
 }
 const cpSelBar = (qid, userId, tag) => `<div class="row" style="gap:8px"><button class="btn sm ghost" onclick="cpToggleAll(true)">Marcar todos</button><button class="btn sm ghost" onclick="cpToggleAll(false)">Desmarcar</button><button class="btn sm mor" id="cpSelBtn" disabled onclick="downloadSelection('${qid}',${userId ? `'${userId}'` : 'null'},'${tag || ''}')">${ICONS.download}<span>Descargar selección en un CSV</span></button></div>`;
 function copilotExportHTML(u, q) {
-  const kpis = DB.kpis.filter(k => k.active !== false).sort((a, b) => (a.periodicity === b.periodicity ? 0 : a.periodicity === 'trimestral' ? -1 : 1) || a.name.localeCompare(b.name));
   const qs = DB.quarters.slice().sort((a, b) => b.startDate.localeCompare(a.startDate));
   const qid = (window.__cpQ && byId('quarters', window.__cpQ)) ? window.__cpQ : q.id;
+  const kpis = copilotKpis(qid).sort((a, b) => (a.periodicity === b.periodicity ? 0 : a.periodicity === 'trimestral' ? -1 : 1) || a.name.localeCompare(b.name));
   return topbar('Exportar para Copilot', 'Un archivo CSV por KPI con estructura tipo base de datos (un renglón por ejecutivo y semana). Adjúntalos a Copilot en PowerPoint con el prompt predefinido para generar las presentaciones.', [[esc(byId('quarters', qid).name), 'm']]) +
     `<div class="filters"><div class="f"><label>Periodo trimestral</label><select onchange="window.__cpQ=this.value;render()">${qs.map(x => `<option value="${x.id}" ${x.id === qid ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
       <div class="row"><button class="btn" onclick="copilotDownloadAll('${qid}')">${ICONS.download}Descargar todos los CSV</button><button class="btn sec" onclick="downloadText('00_diccionario_de_datos.csv', dictionaryCsv())">${ICONS.download}Diccionario de datos</button><button class="btn sec" onclick="downloadText('00_prompt_copilot.txt', COPILOT_PROMPT, 'text/plain;charset=utf-8')">${ICONS.download}Prompt (.txt)</button></div></div>
@@ -2157,8 +2268,13 @@ function copilotExportHTML(u, q) {
     <div class="grid g2 mt24"><div class="card acc-m"><h3>Cómo usarlo en PowerPoint</h3><ol style="margin:0;padding-left:18px;line-height:1.6"><li>Descarga el CSV del KPI (o todos) y guárdalos en OneDrive o SharePoint.</li><li>Abre PowerPoint → Copilot → <b>Crear presentación a partir de archivo</b> o adjunta el CSV con el clip.</li><li>Pega el prompt predefinido (botón "Prompt (.txt)") y envía.</li><li>Revisa cifras contra el Dashboard antes de compartir.</li></ol><p class="small muted mt8">Los archivos van en UTF-8 con separador coma; Excel los abre directo. El orden de columnas es siempre el mismo, así el prompt no cambia.</p></div>
     <div class="card acc-c"><h3>Prompt predefinido</h3><textarea id="cpPrompt" rows="10" style="font-size:13px" readonly>${esc(COPILOT_PROMPT)}</textarea><div class="row mt8"><button class="btn sm" onclick="navigator.clipboard.writeText(COPILOT_PROMPT).then(()=>toast('Prompt copiado','ok'))">Copiar prompt</button></div></div></div>`;
 }
+/* KPIs exportables: todos (admin / directivo) o solo los que tiene asignados el equipo del coordinador */
+function copilotKpis(qid) {
+  const me = currentUser(); const year = parseISO(byId('quarters', qid).startDate).getFullYear();
+  return DB.kpis.filter(k => k.active !== false && (!isCoord(me) || teamOf(me.id).some(x => kpiTarget(x.id, k.id, qid) || annualTarget(x.id, k.id, year))));
+}
 async function copilotDownloadAll(qid) {
-  const kpis = DB.kpis.filter(k => k.active !== false);
+  const kpis = copilotKpis(qid);
   downloadText('00_diccionario_de_datos.csv', dictionaryCsv()); await new Promise(r => setTimeout(r, 400));
   downloadText('00_prompt_copilot.txt', COPILOT_PROMPT, 'text/plain;charset=utf-8'); await new Promise(r => setTimeout(r, 400));
   for (const k of kpis) { downloadText(`KPI_${k.code}_${slugFile(k.name)}_${slugFile(byId('quarters', qid).code)}.csv`, csvText(kpiCsvRows(k.id, qid))); await new Promise(r => setTimeout(r, 450)); }
@@ -2186,6 +2302,7 @@ function myCopilotHTML(u, q) {
 VIEWS['EJECUTIVO:micopilot'] = (u, q) => myCopilotHTML(u, q);
 VIEWS['ADMIN:copilot'] = (u, q) => copilotExportHTML(u, q);
 VIEWS['DIRECTIVO:copilot'] = (u, q) => copilotExportHTML(u, q);
+VIEWS['COORDINADOR:copilot'] = (u, q) => copilotExportHTML(u, q).replace('Exportar para Copilot', 'Datos de mi equipo para Copilot');
 
 /* =====================================================================
    CAPA DE DATOS SUPABASE (producción)
