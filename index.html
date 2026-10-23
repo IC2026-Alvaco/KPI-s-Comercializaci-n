@@ -498,6 +498,15 @@ const isParadosKpi = (k) => !!k && k.captureMode === 'parados';
 function paradosPendientesPrevios(userId, kpiId, qid, weekNumber) { const r = computeKpi(userId, kpiId, qid, weekNumber - 1, { includeDraft: true }); const last = [...r.series].reverse().find(x => x.raw && x.raw.denominator != null); return last ? Math.max(0, (Number(last.raw.denominator) || 0) - (Number(last.raw.numerator) || 0)) : 0; }
 const isConteoKpi = (k) => !!k && k.type === 'C' && k.numeratorMode === 'acumulado' && k.denominatorMode === 'acumulado';
 function listaLines(txt) { return String(txt || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean); }
+/* KPI Costos locales (Arquitectura): por local remodelado se captura zona, m² y costo real; cumple si costo real ≤ tarifa × m² × (1 + tolerancia) */
+const isCostosKpi = (k) => !!k && k.captureMode === 'costos';
+function costZonas() { const z = DB.settings.costZonas; return Array.isArray(z) ? z.filter(x => x && x.zona).map(x => ({ zona: String(x.zona), tarifa: Number(x.tarifa) || 0 })) : [{ zona: 'Norte', tarifa: 6930 }, { zona: 'Centro', tarifa: 6300 }, { zona: 'Sur', tarifa: 6615 }]; }
+function costTolerancia() { const t = Number(DB.settings.costTolerancia); return isNaN(t) ? 5 : t; }
+function costRate(zona) { const z = costZonas().find(x => x.zona === zona); return z ? z.tarifa : 0; }
+/* Evalúa un local remodelado: objetivo, tope y si cumple (null = incompleto) */
+function costEval(it) { const rate = Number(it.rateM2) || costRate(it.zone); const m2 = Number(it.areaM2), real = Number(it.realCost); if (!it.zone || !(rate > 0) || !(m2 > 0) || it.realCost === '' || it.realCost == null || isNaN(real) || real < 0) return { ok: null, rate, target: rate > 0 && m2 > 0 ? rate * m2 : null, limit: null }; const target = rate * m2, limit = target * (1 + costTolerancia() / 100); return { ok: real <= limit + 1e-9, rate, target, limit, realM2: real / m2 }; }
+function costItemsOf(valueId) { return where('kpi_cost_items', b => b.weeklyKpiValueId === valueId).sort((a, b) => a.seq - b.seq); }
+const fmtMoney = (n) => n == null || isNaN(n) ? '—' : '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 function localItemsOf(valueId) { return where('kpi_local_items', b => b.weeklyKpiValueId === valueId).sort((a, b) => a.seq - b.seq); }
 const localItemFast = (it) => Number(it.installDays) <= 30;
 /* Días de instalación = fecha de instalación (fin) − fecha de referencia (inicio), en días naturales */
@@ -535,7 +544,7 @@ function semaforo(pct, thr) {
   if (pct >= thr.yellow) return { code: 'amarillo', label: 'En proceso', cls: 'b-amar', dot: 'y' };
   return { code: 'rojo', label: 'Pendiente', cls: 'b-rojo', dot: 'r' };
 }
-function requiresBreakdown(kpi, t) { if (isListaKpi(kpi) || isLocalesKpi(kpi)) return false; return t && t.requiresBreakdown != null ? !!t.requiresBreakdown : !!kpi.requiresChainBreakdown; }
+function requiresBreakdown(kpi, t) { if (isListaKpi(kpi) || isLocalesKpi(kpi) || isCostosKpi(kpi)) return false; return t && t.requiresBreakdown != null ? !!t.requiresBreakdown : !!kpi.requiresChainBreakdown; }
 function pctOf(kpi, meta, current) { if (!(meta > 0) || current == null) return null; return kpi.direction === 'menor' ? (current > 0 ? meta / current * 100 : null) : current / meta * 100; }
 
 /* Núcleo: evalúa un KPI trimestral sobre un conjunto ordenado de semanas (pueden ser de varios trimestres). */
@@ -678,6 +687,7 @@ function deleteSubmission(userId, weekId) {
   if (!canEditWeek(me, w) || (s.status === 'cerrado' && !isAdmin(me))) throw new Error('La semana está cerrada; solicita al administrador que la reabra');
   const vals = valuesOf(s.id); const vids = new Set(vals.map(v => v.id));
   DB.kpi_local_items = DB.kpi_local_items.filter(it => !vids.has(it.weeklyKpiValueId));
+  DB.kpi_cost_items = (DB.kpi_cost_items || []).filter(it => !vids.has(it.weeklyKpiValueId));
   DB.kpi_chain_breakdowns = DB.kpi_chain_breakdowns.filter(b => !vids.has(b.weeklyKpiValueId));
   DB.comments = (DB.comments || []).filter(c => c.submissionId !== s.id);
   DB.weekly_kpi_values = DB.weekly_kpi_values.filter(v => v.submissionId !== s.id);
@@ -732,11 +742,24 @@ function validateCapture(user, week, payload, mode = 'enviar') {
   const assigned = new Set(chainsOf(user.id).map(c => c.id));
   for (const t of ts) {
     const kpi = byId('kpis', t.kpiId); const p = payload[t.kpiId] || {}; const e = [];
-    const locales = isLocalesKpi(kpi);
+    const locales = isLocalesKpi(kpi) || isCostosKpi(kpi);
     const has = locales ? (p.value !== '' && p.value != null) : isConjuntoKpi(kpi) ? (p.fijas !== '' && p.fijas != null && p.variables !== '' && p.variables != null) : kpi.type === 'A' ? (p.value !== '' && p.value != null) : (p.numerator !== '' && p.numerator != null && p.denominator !== '' && p.denominator != null);
     if (!has) { if (mode === 'enviar') e.push('Falta captura'); }
     else if (isConjuntoKpi(kpi)) { if (Number(p.fijas) < 0 || Number(p.variables) < 0 || isNaN(Number(p.fijas)) || isNaN(Number(p.variables))) e.push('Rentas fijas y variables deben ser números ≥ 0'); }
     else if (isParadosKpi(kpi)) { if (Number(p.numerator) < 0 || Number(p.denominator) < 0) e.push('No se permiten valores negativos'); if (Number(p.numerator) > Number(p.denominator)) e.push(`${kpi.name}: los resueltos no pueden ser más que los que tenían`); }
+    else if (isCostosKpi(kpi)) {
+      const n = Number(p.value); const items = p.items || [];
+      const legacy = p.legacyNumerator != null && items.length === 0 && n === p.legacyDen;  // semana capturada con el formato anterior (solo números): se respeta
+      if (isNaN(n) || n < 0 || n !== Math.floor(n)) e.push('Indica un número entero de locales remodelados');
+      else if (!legacy && items.length !== n) e.push(`Se reportaron ${n} locales y hay ${items.length} con detalle`);
+      items.forEach((it, j) => {
+        const faltan = [];
+        if (!it.zone || !(costRate(it.zone) > 0)) faltan.push('zona');
+        if (it.areaM2 === '' || it.areaM2 == null || isNaN(Number(it.areaM2)) || Number(it.areaM2) <= 0) faltan.push('metros cuadrados');
+        if (it.realCost === '' || it.realCost == null || isNaN(Number(it.realCost)) || Number(it.realCost) < 0) faltan.push('costo real');
+        if (faltan.length && mode === 'enviar') e.push(`Local ${j + 1}: falta ${faltan.join(', ')}`);
+      });
+    }
     else if (locales) {
       const n = Number(p.value); const items = p.items || [];
       if (isNaN(n) || n < 0 || n !== Math.floor(n)) e.push('Indica un número entero de locales instalados');
@@ -798,6 +821,9 @@ function saveCapture(user, week, payload, mode) {
     if (isLocalesKpi(kpi)) {
       const items = (p.items || []); const den = num(p.value); const numer = den == null ? null : items.filter(localItemFast).length;
       nv = { value: den > 0 ? numer / den * 100 : null, numerator: numer, denominator: den, comment: p.comment || '' };
+    } else if (isCostosKpi(kpi)) {
+      const items = (p.items || []); const den = num(p.value); const legacy = p.legacyNumerator != null && items.length === 0 && den === p.legacyDen; const numer = den == null ? null : legacy ? p.legacyNumerator : items.filter(it => costEval(it).ok === true).length;
+      nv = { value: den > 0 ? numer / den * 100 : null, numerator: numer, denominator: den, comment: p.comment || '' };
     } else nv = { value: kpi.type === 'A' ? num(p.value) : (num(p.numerator) != null && num(p.denominator) ? num(p.numerator) / num(p.denominator) * 100 : null), numerator: num(p.numerator), denominator: num(p.denominator), comment: p.comment || '', detail: isListaKpi(kpi) ? (listaLines(p.detail).join('\n') || null) : null };
     if (isListaKpi(kpi)) nv.value = listaLines(p.detail).length;
     if (isConjuntoKpi(kpi)) { const f = num(p.fijas) || 0, va = num(p.variables) || 0; const g = rentasGlobalTrimestre(week.quarterId); nv.numerator = f + va; nv.denominator = g.trimestre || null; nv.value = g.trimestre > 0 ? (f + va) / g.trimestre * 100 : null; nv.detail = `Fijas: ${f} | Variables: ${va}`; }
@@ -813,6 +839,17 @@ function saveCapture(user, week, payload, mode) {
         const ex = localItemsOf(v.id).find(x => x.seq === it.seq);
         if (ex) { for (const f of ['kind', 'referenceDate', 'installDate', 'installDays', 'note']) { if ((ex[f] ?? null) !== (it[f] ?? null)) { audit('kpi_local_items', ex.id, 'editar', `${kpi.name} local ${it.seq}.${f}`, ex[f], it[f]); ex[f] = it[f]; } } }
         else { const r = { id: uid('loc'), weeklyKpiValueId: v.id, ...it }; DB.kpi_local_items.push(r); audit('kpi_local_items', r.id, 'crear', `${kpi.name} local ${it.seq}`, null, `${it.kind} ${it.referenceDate} ${it.installDays}d`); }
+      }
+    }
+    // detalle por local remodelado (KPI Costos locales)
+    if (isCostosKpi(kpi)) {
+      DB.kpi_cost_items = DB.kpi_cost_items || [];
+      const old = costItemsOf(v.id); const items = (p.items || []).map((it, j) => { const ev = costEval(it); return { seq: j + 1, zone: it.zone, rateM2: ev.rate, areaM2: Number(it.areaM2), realCost: Number(it.realCost), tolerancePct: costTolerancia(), note: it.note || null }; });
+      for (const ob of old) { if (ob.seq > items.length) { audit('kpi_cost_items', ob.id, 'eliminar', `${kpi.name} local ${ob.seq}`, `${ob.zone} ${ob.areaM2}m² $${ob.realCost}`, null); DB.kpi_cost_items = DB.kpi_cost_items.filter(x => x.id !== ob.id); } }
+      for (const it of items) {
+        const ex = costItemsOf(v.id).find(x => x.seq === it.seq);
+        if (ex) { for (const f of ['zone', 'rateM2', 'areaM2', 'realCost', 'tolerancePct', 'note']) { if ((ex[f] ?? null) !== (it[f] ?? null)) { audit('kpi_cost_items', ex.id, 'editar', `${kpi.name} local ${it.seq}.${f}`, ex[f], it[f]); ex[f] = it[f]; } } }
+        else { const r = { id: uid('cost'), weeklyKpiValueId: v.id, ...it }; DB.kpi_cost_items.push(r); audit('kpi_cost_items', r.id, 'crear', `${kpi.name} local ${it.seq}`, null, `${it.zone} ${it.areaM2}m² $${it.realCost}`); }
       }
     }
     // desglose
@@ -852,7 +889,7 @@ function seedDatabase() {
     areas: [{ id: 'a_nte', name: 'Célula Norte' }, { id: 'a_cen', name: 'Célula Centro' }, { id: 'a_sur', name: 'Célula Sur-Sureste' }, { id: 'a_nac', name: 'Cuentas Nacionales' }, { id: 'a_ic', name: 'Inteligencia Comercial' }, { id: 'a_dir', name: 'Dirección Comercial' }],
     positions: [{ id: 'p_ecs', name: 'Ejecutivo Comercial Sr.' }, { id: 'p_ec', name: 'Ejecutivo Comercial' }, { id: 'p_kam', name: 'Key Account Manager' }, { id: 'p_ger', name: 'Gerente Regional' }, { id: 'p_coord', name: 'Coordinador de IC' }, { id: 'p_dir', name: 'Director Comercial' }],
     users: [], quarters: [], reporting_weeks: [], kpis: [], user_kpi_targets: [], chains: [], user_chain_assignments: [], chain_requests: [],
-    weekly_submissions: [], weekly_kpi_values: [], kpi_chain_breakdowns: [], kpi_local_items: [], annual_kpi_entries: [], audit_logs: []
+    weekly_submissions: [], weekly_kpi_values: [], kpi_chain_breakdowns: [], kpi_local_items: [], kpi_cost_items: [], annual_kpi_entries: [], audit_logs: []
   };
   const U = (id, name, email, roleId, areaId, positionId) => db.users.push({ id, name, email, password: '1234', roleId, areaId, positionId, active: true, createdAt: '2026-09-01T09:00:00Z' });
   U('u_admin', 'David Castillo', 'david.castillo@alvaco.com.mx', 'r_admin', 'a_ic', 'p_coord');
@@ -1388,6 +1425,7 @@ function payloadFromSubmission(u, q, s, w = null) {
     // Ratio con denominador "snapshot" (p. ej. universo de tiendas a prospectar): se propone el último denominador capturado
     let denPrev = '';
     if (!v && w && kpi.type === 'C' && kpi.denominatorMode === 'snapshot') { const r = computeKpi(u.id, t.kpiId, q.id, w.number - 1, { includeDraft: true }); const last = [...r.series].reverse().find(x => x.raw && x.raw.denominator != null); if (last) denPrev = last.raw.denominator; }
+    if (isCostosKpi(kpi)) { const its = v ? costItemsOf(v.id) : []; p[t.kpiId] = { value: v && v.denominator != null ? v.denominator : '', numerator: '', denominator: '', comment: v ? v.comment || '' : '', breakdown: [], items: its.map(it => ({ zone: it.zone, rateM2: it.rateM2, areaM2: it.areaM2, realCost: it.realCost, note: it.note || '' })), legacyNumerator: (v && !its.length && v.numerator != null && v.denominator != null) ? Number(v.numerator) : null, legacyDen: (v && !its.length && v.numerator != null && v.denominator != null) ? Number(v.denominator) : null }; continue; }
     if (isLocalesKpi(kpi)) { p[t.kpiId] = { value: v && v.denominator != null ? v.denominator : '', numerator: '', denominator: '', comment: v ? v.comment || '' : '', breakdown: [], items: v ? localItemsOf(v.id).map(it => ({ kind: it.kind, referenceDate: it.referenceDate, installDate: it.installDate || '', installDays: it.installDays, note: it.note || '' })) : [] }; continue; }
     if (isConjuntoKpi(kpi)) { const fv = parseFV(v ? v.detail : ''); p[t.kpiId] = { value: '', numerator: v && v.numerator != null ? v.numerator : '', denominator: '', comment: v ? v.comment || '' : '', breakdown: [], fijas: fv.fijas, variables: fv.variables }; continue; }
     if (isParadosKpi(kpi)) { const pend = w ? paradosPendientesPrevios(u.id, t.kpiId, q.id, w.number) : 0; const den = v && v.denominator != null ? v.denominator : ''; p[t.kpiId] = { value: '', numerator: v && v.numerator != null ? v.numerator : '', denominator: den, comment: v ? v.comment || '' : '', breakdown: [], pendPrev: pend, nuevos: den === '' ? '' : Math.max(0, Number(den) - pend) }; continue; }
@@ -1423,11 +1461,29 @@ function renderCaptureModal() {
 }
 function captureKpiHTML(t, i, chains, val) {
   const kpi = byId('kpis', t.kpiId); const p = CAP.payload[t.kpiId]; const ro = CAP.readOnly ? 'disabled' : '';
-  const pk = val.perKpi[t.kpiId]; const has = (kpi.type === 'A' || isLocalesKpi(kpi)) ? p.value !== '' : (p.numerator !== '' && p.denominator !== '');
+  const pk = val.perKpi[t.kpiId]; const has = (kpi.type === 'A' || isLocalesKpi(kpi) || isCostosKpi(kpi)) ? p.value !== '' : (p.numerator !== '' && p.denominator !== '');
   const cls = pk.complete ? 'ok' : has ? 'err' : '';
   const prev = computeKpi(t.userId, t.kpiId, t.quarterId, CAP.w.number - 1);
   let inputs = '';
-  if (isLocalesKpi(kpi)) {
+  if (isCostosKpi(kpi)) {
+    const n = Number(p.value) || 0; const items = p.items || []; const evs = items.map(costEval); const okN = evs.filter(e => e.ok === true).length;
+    const prevNum = prev.series.reduce((a, x) => a + (x.raw && x.raw.numerator != null ? Number(x.raw.numerator) : 0), 0), prevDen = prev.series.reduce((a, x) => a + (x.raw && x.raw.denominator != null ? Number(x.raw.denominator) : 0), 0);
+    const legacyN = (p.legacyNumerator != null && !items.length && n === p.legacyDen) ? p.legacyNumerator : okN;
+    const accN = prevNum + legacyN, accD = prevDen + n; const tol = costTolerancia(); const zonas = costZonas();
+    inputs = `<div class="fields c3"><div class="field"><label>¿Cuántos locales remodelaron esta semana?</label><input type="text" inputmode="numeric" ${ro} value="${p.value}" oninput="capCostN('${t.kpiId}',this.value)"></div>
+      <div class="field"><label>Dentro del costo objetivo (esta semana)</label><input value="${p.value === '' ? '—' : (p.legacyNumerator != null && !items.length && n === p.legacyDen ? p.legacyNumerator + ' de ' + n + ' (captura anterior)' : okN + ' de ' + n)}" disabled></div>
+      <div class="field"><label>Acumulado del trimestre con esta semana</label><input value="${accD > 0 ? accN + ' de ' + accD + ' → ' + fmtPct(accN / accD * 100, 1) + ' · meta ' + fmtPct(t.target, 0) : '—'}" disabled></div></div>
+      <div class="small muted" style="margin:-4px 0 10px">Tarifas por m²: ${zonas.map(z => `<b>${esc(z.zona)}</b> ${fmtMoney(z.tarifa)}`).join(' · ')} · Costo objetivo = tarifa × m² · cumple si el costo real no pasa del objetivo + ${tol}%</div>
+      ${items.length ? `<div class="breakdown"><h4>Detalle por local remodelado</h4>
+      ${items.map((it, j) => { const ev = evs[j]; const ok = ev.ok; return `<div class="loc-row ${ok == null ? '' : ok ? 'fast' : 'slow'}"><div class="loc-head"><b>Local ${j + 1}</b>${ok == null ? badge('b-amar', 'Incompleto', 'alert') : ok ? badge('b-verde', 'Dentro del objetivo', 'check') : badge('b-rojo', 'Fuera del objetivo', 'alert')}</div>
+        <div class="fields c4"><div class="field"><label>Zona</label><select ${ro} onchange="capCost('${t.kpiId}',${j},'zone',this.value)"><option value="">— Elige —</option>${zonas.map(z => `<option value="${esc(z.zona)}" ${it.zone === z.zona ? 'selected' : ''}>${esc(z.zona)} · ${fmtMoney(z.tarifa)}/m²</option>`).join('')}</select></div>
+        <div class="field"><label>Metros cuadrados del local</label><input type="text" inputmode="decimal" ${ro} value="${it.areaM2 ?? ''}" oninput="capCost('${t.kpiId}',${j},'areaM2',this.value)"></div>
+        <div class="field"><label>Costo real de la remodelación ($)</label><input type="text" inputmode="decimal" ${ro} value="${it.realCost ?? ''}" oninput="capCost('${t.kpiId}',${j},'realCost',this.value)"></div>
+        <div class="field"><label>Costo objetivo (tarifa × m²)</label><input value="${ev.target != null ? fmtMoney(ev.target) : '—'}" disabled></div></div>
+        ${ev.target != null ? `<div class="small ${ok === false ? '' : 'muted'}" style="${ok === false ? 'color:var(--rojo)' : ''}">Tope permitido (+${tol}%): <b>${fmtMoney(ev.target * (1 + tol / 100))}</b>${ok != null ? ` · costo real por m²: <b>${fmtMoney(ev.realM2)}</b> vs tarifa ${fmtMoney(ev.rate)} (${ev.realM2 > ev.rate ? '+' : ''}${fmtPct((ev.realM2 / ev.rate - 1) * 100, 1)})${ok ? '' : ' · supera el tope'}` : ''}</div>` : ''}</div>`; }).join('')}
+      </div>` : ''}
+      <div class="note">${esc(kpi.formulaDescription)}</div>`;
+  } else if (isLocalesKpi(kpi)) {
     const n = Number(p.value) || 0; const items = p.items || []; const fast = items.filter(it => it.installDays !== '' && it.installDays != null && localItemFast(it)).length;
     const prevNum = prev.series.reduce((a, x) => a + (x.raw && x.raw.numerator != null ? Number(x.raw.numerator) : 0), 0), prevDen = prev.series.reduce((a, x) => a + (x.raw && x.raw.denominator != null ? Number(x.raw.denominator) : 0), 0);
     const accN = prevNum + fast, accD = prevDen + n;
@@ -1536,6 +1592,8 @@ function capBdAdd(kpiId) { CAP.payload[kpiId].breakdown.push({ chainId: '', quan
 function capBdRemove(kpiId, j) { CAP.payload[kpiId].breakdown.splice(j, 1); capRefresh(); }
 /* KPI Locales: el número de locales genera un renglón por cada uno */
 function capLocN(kpiId, v) { v = numClean(v); const p = CAP.payload[kpiId]; p.value = v; const n = Math.max(0, Math.min(200, Math.floor(Number(v) || 0))); p.items = p.items || []; while (p.items.length < n) p.items.push({ kind: '', referenceDate: '', installDate: '', installDays: '', note: '' }); if (p.items.length > n) p.items.length = n; capRefresh(); }
+function capCostN(kpiId, v) { v = numClean(v); const p = CAP.payload[kpiId]; p.value = v; const n = Math.max(0, Math.min(200, Math.floor(Number(v) || 0))); p.items = p.items || []; if (p.legacyNumerator != null && !p.items.length && n === p.legacyDen) { capRefresh(); return; } while (p.items.length < n) p.items.push({ zone: '', rateM2: '', areaM2: '', realCost: '', note: '' }); if (p.items.length > n) p.items.length = n; capRefresh(); }
+function capCost(kpiId, j, field, v) { const it = CAP.payload[kpiId].items[j]; it[field] = field === 'zone' ? v : String(v).replace(/[^\d.]/g, ''); if (field === 'zone') it.rateM2 = costRate(v); capRefresh(); }
 function capLoc(kpiId, j, field, v) { const it = CAP.payload[kpiId].items[j]; it[field] = field === 'installDays' ? numClean(v) : v; if (field === 'referenceDate' || field === 'installDate') { const d = localDaysBetween(it.referenceDate, it.installDate); if (it.installDate) it.installDays = d == null ? '' : String(d); } capRefresh(); }
 function submitCapture(mode, confirmed = false) {
   const val = validateCapture(CAP.u, CAP.w, CAP.payload, mode);
@@ -1782,7 +1840,7 @@ function historicoHTML(u, q, cw) {
   const annRows = DB.annual_kpi_entries.filter(e => d.users.find(u => u.id === e.userId) && (!BI.kpiId || e.kpiId === BI.kpiId)).sort((a, b) => b.ts.localeCompare(a.ts));
   return topbar('Histórico', 'Base completa de capturas por semana, ejecutivo y KPI, con acumulado a la fecha y desglose por cadena; más la bitácora de KPIs anuales.', biChips()) + biFiltersHTML() +
     `<div class="row between mb8"><span class="small muted">${rows.length} registros</span><button class="btn sec sm" onclick="exportWorkbook(buildExportSheets(BI.qid),'KPIs_${byId('quarters', BI.qid).code.replace(/\s/g, '_')}.xlsx')">${ICONS.download}Exportar a Excel</button></div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Semana</th><th>Ejecutivo</th><th>KPI</th><th class="num">Valor semana</th><th class="num">Num / Den</th><th class="num">Acumulado</th><th class="num">% Cumpl.</th><th>Semáforo</th><th>Desglose por cadena</th><th>Estado</th></tr></thead><tbody>${rows.map(r => `<tr><td><b>S${r.w.number}</b> <span class="small muted">${fmtRange(r.w.startDate, r.w.endDate)}</span></td><td>${esc(r.us.name)}</td><td>${esc(r.kpi.name)}</td><td class="num"><b>${r.kpi.type === 'A' ? fmtNum(r.v.value) : fmtPct(r.v.value)}</b></td><td class="num small">${r.v.numerator != null ? fmtNum(r.v.numerator) + ' / ' + fmtNum(r.v.denominator) : '—'}</td><td class="num">${kpiValueText(r.k)}</td><td class="num">${fmtPct(r.k.pct)}</td><td>${semCell(r.k.sem)}</td><td class="small">${r.v.detail ? listaLines(r.v.detail).map(esc).join(', ') : (r.bds.map(b => `<span class="badge b-azul">${esc(nameOf('chains', b.chainId))} ${fmtNum(b.quantity)}</span>`).join(' ') || '—')}</td><td>${stateBadge(weekState(r.us.id, r.w))}</td></tr>`).join('') || '<tr><td colspan="10" class="center muted">Sin registros</td></tr>'}</tbody></table></div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Semana</th><th>Ejecutivo</th><th>KPI</th><th class="num">Valor semana</th><th class="num">Num / Den</th><th class="num">Acumulado</th><th class="num">% Cumpl.</th><th>Semáforo</th><th>Desglose por cadena</th><th>Estado</th></tr></thead><tbody>${rows.map(r => `<tr><td><b>S${r.w.number}</b> <span class="small muted">${fmtRange(r.w.startDate, r.w.endDate)}</span></td><td>${esc(r.us.name)}</td><td>${esc(r.kpi.name)}</td><td class="num"><b>${r.kpi.type === 'A' ? fmtNum(r.v.value) : fmtPct(r.v.value)}</b></td><td class="num small">${r.v.numerator != null ? fmtNum(r.v.numerator) + ' / ' + fmtNum(r.v.denominator) : '—'}</td><td class="num">${kpiValueText(r.k)}</td><td class="num">${fmtPct(r.k.pct)}</td><td>${semCell(r.k.sem)}</td><td class="small">${isCostosKpi(r.kpi) ? (costItemsOf(r.v.id).map(it => { const ev = costEval(it); return `<span class="badge ${ev.ok ? 'b-verde' : 'b-rojo'}">${esc(it.zone)} ${fmtNum(it.areaM2)}m² ${fmtMoney(it.realCost)}</span>`; }).join(' ') || '—') : isLocalesKpi(r.kpi) ? (localItemsOf(r.v.id).map(it => `<span class="badge ${localItemFast(it) ? 'b-verde' : 'b-rojo'}">${esc(it.kind)} ${it.installDays}d</span>`).join(' ') || '—') : r.v.detail ? listaLines(r.v.detail).map(esc).join(', ') : (r.bds.map(b => `<span class="badge b-azul">${esc(nameOf('chains', b.chainId))} ${fmtNum(b.quantity)}</span>`).join(' ') || '—')}</td><td>${stateBadge(weekState(r.us.id, r.w))}</td></tr>`).join('') || '<tr><td colspan="10" class="center muted">Sin registros</td></tr>'}</tbody></table></div>
     <div class="tbl-title mt24"><h3>Bitácora de KPIs anuales</h3><span class="small muted">${annRows.length} actualizaciones</span></div>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fecha y hora</th><th>Ejecutivo</th><th>KPI</th><th class="num">Valor</th><th class="num">Num / Den</th><th>Comentario</th><th>Modificó</th></tr></thead><tbody>${annRows.map(e => { const kpi = byId('kpis', e.kpiId); return `<tr><td class="small" style="white-space:nowrap">${fmtDateTime(e.ts)}</td><td>${esc(nameOf('users', e.userId))}</td><td>${esc(kpi.name)} <span class="badge b-mor">${e.year}</span></td><td class="num"><b>${kpi.type === 'A' ? fmtNum(e.value) : fmtPct(e.value)}</b></td><td class="num small">${e.numerator != null ? fmtNum(e.numerator) + ' / ' + fmtNum(e.denominator) : '—'}</td><td class="small">${e.detail ? listaLines(e.detail).map(esc).join(', ') + ' · ' : ''}${esc(e.comment || '')}</td><td class="small">${esc(nameOf('users', e.createdBy, 'sistema'))}</td></tr>`; }).join('') || '<tr><td colspan="7" class="center muted">Sin registros</td></tr>'}</tbody></table></div>`;
 }
@@ -1918,7 +1976,7 @@ function kpiDlg(id) {
     ${formField('Periodicidad', `<select id="k_per"><option value="trimestral" ${k.periodicity !== 'anual' ? 'selected' : ''}>Trimestral · captura semanal</option><option value="anual" ${k.periodicity === 'anual' ? 'selected' : ''}>Anual · captura libre con bitácora</option></select>`)}${formField('Tipo de cálculo', `<select id="k_type" onchange="kpiTypeUI()"><option value="A" ${k.type === 'A' ? 'selected' : ''}>A · Cantidad acumulativa</option><option value="B" ${k.type === 'B' ? 'selected' : ''}>B · Porcentaje / snapshot</option><option value="C" ${k.type === 'C' ? 'selected' : ''}>C · Ratio contra objetivo</option></select>`)}${formField('Unidad', `<input id="k_unit" value="${esc(k.unit)}">`)}
     ${formField('Actividad central', `<input id="k_act" value="${esc(k.centralActivity || '')}">`)}${formField('Dirección', `<select id="k_dir"><option value="mayor" ${k.direction !== 'menor' ? 'selected' : ''}>Mayor es mejor</option><option value="menor" ${k.direction === 'menor' ? 'selected' : ''}>Menor es mejor (invierte el cumplimiento)</option></select>`)}</div>
     ${formField('Descripción de la fórmula', `<textarea id="k_form" rows="2">${esc(k.formulaDescription || '')}</textarea>`)}
-    <div id="k_ratio" class="fields ${k.type === 'A' ? 'hidden' : ''}">${formField('Etiqueta del numerador', `<input id="k_numl" value="${esc(k.numeratorLabel || '')}">`)}${formField('Etiqueta del denominador', `<input id="k_denl" value="${esc(k.denominatorLabel || '')}">`)}${formField('Modo de captura', `<select id="k_capm"><option value="normal" ${!['locales','lista','conjunto','parados','corporativo'].includes(k.captureMode) ? 'selected' : ''}>Normal (cantidad o numerador y denominador)</option><option value="lista" ${k.captureMode === 'lista' ? 'selected' : ''}>Lista de nombres: se escriben uno por renglón y cada uno cuenta 1 (semanal o anual)</option><option value="conjunto" ${k.captureMode === 'conjunto' ? 'selected' : ''}>Rentas pagadas (conjunto): fijas + variables de cada quien vs. el global del trimestre de Parámetros</option><option value="corporativo" ${k.captureMode === 'corporativo' ? 'selected' : ''}>Corporativo: un solo valor para toda la compañía; solo lo actualiza el responsable de Parámetros</option><option value="parados" ${k.captureMode === 'parados' ? 'selected' : ''}>Equipos parados: pendientes anteriores + nuevos = tenían; resueltos; el resto pasa a la siguiente semana</option><option value="locales" ${k.captureMode === 'locales' ? 'selected' : ''}>Locales: un renglón por local (nuevo / reacondicionado, fecha, días)</option></select>`)}${formField('Numerador', `<select id="k_numm"><option value="acumulado" ${k.numeratorMode !== 'snapshot' ? 'selected' : ''}>Acumulado en el trimestre</option><option value="snapshot" ${k.numeratorMode === 'snapshot' ? 'selected' : ''}>Snapshot de la semana</option></select>`)}${formField('Denominador', `<select id="k_denm"><option value="snapshot" ${k.denominatorMode !== 'acumulado' ? 'selected' : ''}>Snapshot de la semana</option><option value="acumulado" ${k.denominatorMode === 'acumulado' ? 'selected' : ''}>Acumulado en el trimestre</option></select>`)}</div>
+    <div id="k_ratio" class="fields ${k.type === 'A' ? 'hidden' : ''}">${formField('Etiqueta del numerador', `<input id="k_numl" value="${esc(k.numeratorLabel || '')}">`)}${formField('Etiqueta del denominador', `<input id="k_denl" value="${esc(k.denominatorLabel || '')}">`)}${formField('Modo de captura', `<select id="k_capm"><option value="normal" ${!['locales','lista','conjunto','parados','corporativo'].includes(k.captureMode) ? 'selected' : ''}>Normal (cantidad o numerador y denominador)</option><option value="lista" ${k.captureMode === 'lista' ? 'selected' : ''}>Lista de nombres: se escriben uno por renglón y cada uno cuenta 1 (semanal o anual)</option><option value="conjunto" ${k.captureMode === 'conjunto' ? 'selected' : ''}>Rentas pagadas (conjunto): fijas + variables de cada quien vs. el global del trimestre de Parámetros</option><option value="corporativo" ${k.captureMode === 'corporativo' ? 'selected' : ''}>Corporativo: un solo valor para toda la compañía; solo lo actualiza el responsable de Parámetros</option><option value="costos" ${k.captureMode === 'costos' ? 'selected' : ''}>Costos locales: por local remodelado se captura zona, m² y costo real; cumple si no pasa del objetivo + tolerancia</option><option value="parados" ${k.captureMode === 'parados' ? 'selected' : ''}>Equipos parados: pendientes anteriores + nuevos = tenían; resueltos; el resto pasa a la siguiente semana</option><option value="locales" ${k.captureMode === 'locales' ? 'selected' : ''}>Locales: un renglón por local (nuevo / reacondicionado, fecha, días)</option></select>`)}${formField('Numerador', `<select id="k_numm"><option value="acumulado" ${k.numeratorMode !== 'snapshot' ? 'selected' : ''}>Acumulado en el trimestre</option><option value="snapshot" ${k.numeratorMode === 'snapshot' ? 'selected' : ''}>Snapshot de la semana</option></select>`)}${formField('Denominador', `<select id="k_denm"><option value="snapshot" ${k.denominatorMode !== 'acumulado' ? 'selected' : ''}>Snapshot de la semana</option><option value="acumulado" ${k.denominatorMode === 'acumulado' ? 'selected' : ''}>Acumulado en el trimestre</option></select>`)}</div>
     <div id="k_bdwrap" class="${k.type !== 'A' ? 'hidden' : ''}"><label class="switch"><input type="checkbox" id="k_bd" ${k.requiresChainBreakdown ? 'checked' : ''}> Requiere desglose por cadena (la suma del detalle debe igualar el total reportado)</label></div>`,
     `<button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" onclick="saveKpi('${id || ''}')">${ICONS.save}Guardar</button>`);
 }
@@ -2094,6 +2152,7 @@ VIEWS['ADMIN:parametros'] = (u, q) => {
       <div class="card acc-c"><h3>Textos</h3>${formField('Nombre de la aplicación', `<input id="p_app" value="${esc(s.appName)}">`)}${formField('Empresa / área (pie de página)', `<input id="p_company" value="${esc(s.company)}">`)}${formField('Texto del recordatorio', `<input id="p_rem" value="${esc(s.reminderText)}">`)}</div>
       <div class="card acc-g"><h3>Tarjetas del dashboard directivo</h3><p class="small muted">Las tarjetas fijas son Avance comercial general, Instalaciones y Clientes nuevos. Elige los 3 KPIs (trimestrales o anuales) de las tarjetas configurables.</p>${[0, 1, 2].map(i => formField('Tarjeta ' + (i + 4), `<select id="p_tile${i}">${DB.kpis.filter(k => k.active).map(k => `<option value="${k.id}" ${(s.dashboardTiles || [])[i] === k.id ? 'selected' : ''}>${esc(k.name)}${k.periodicity === 'anual' ? ' (anual)' : ''}</option>`).join('')}</select>`)).join('')}</div>
       <div class="card acc-v"><h3>Rentas por pagar (dato global de Inteligencia Comercial)</h3><p class="small muted">Rentas que debe pagar toda la compañía cada mes. El KPI "Rentas Pagadas" compara la suma de lo que capturan todos los ejecutivos contra este total × los meses del trimestre.</p><div class="fields">${formField('Rentas FIJAS al mes (incluye bodegas)', `<input id="p_rfij" type="number" min="0" value="${s.rentasMesFijas ?? 0}">`)}${formField('Rentas VARIABLES al mes', `<input id="p_rvar" type="number" min="0" value="${s.rentasMesVariables ?? 0}">`)}</div><div class="small muted">Total al mes: <b>${fmtNum((Number(s.rentasMesFijas) || 0) + (Number(s.rentasMesVariables) || 0))}</b> · Trimestre (× ${q ? monthsOfQuarter(q.id).length : 3} meses): <b>${fmtNum(((Number(s.rentasMesFijas) || 0) + (Number(s.rentasMesVariables) || 0)) * (q ? monthsOfQuarter(q.id).length : 3))}</b></div></div>
+      <div class="card acc-y"><h3>Costos locales (Arquitectura): tarifas por zona</h3><p class="small muted">Costo objetivo por m² de cada zona. Al capturar un local remodelado se elige la zona, se escriben los m² y el costo real; cumple si el costo real no pasa del objetivo más la tolerancia.</p><div class="fields c3">${[0, 1, 2, 3].map(i => { const z = costZonas()[i] || { zona: '', tarifa: '' }; return `<div class="field"><label>Zona ${i + 1}</label><input id="p_cz${i}" value="${esc(z.zona)}" placeholder="Nombre"></div><div class="field"><label>Tarifa por m² ($)</label><input id="p_ct${i}" type="text" inputmode="decimal" value="${z.tarifa === '' ? '' : z.tarifa}"></div><div></div>`; }).join('')}</div>${formField('Tolerancia sobre el costo objetivo (%)', `<input id="p_ctol" type="text" inputmode="decimal" value="${costTolerancia()}">`)}<p class="small muted">Los locales ya capturados conservan la tarifa y tolerancia con la que se evaluaron.</p></div>
       <div class="card acc-g"><h3>KPIs corporativos (Meta anual corporativa)</h3><p class="small muted">Correo de la persona que puede actualizar el avance de los KPIs en modo corporativo. Los demás solo lo ven. Varios correos separados por coma.</p>${formField('Responsable de actualizar', `<input id="p_corp" value="${esc(s.kpiCorporativoEditor || '')}" placeholder="liliana.rincon@alvaco.com.mx">`)}</div>
       <div class="card acc-r"><h3>Respaldo completo de la base</h3><p class="small muted">Descarga TODO lo guardado en Supabase (usuarios, KPIs, metas, cadenas, asignaciones, capturas semanales con desgloses y locales, bitácora anual, comentarios, parámetros y auditoría). Hazlo antes de aplicar cualquier cambio en la base. El JSON sirve para restaurar (con el script <b>restaurar_respaldo.py</b>); el Excel es para consultar.</p><div class="row"><button class="btn" onclick="backupJSON()">${ICONS.download}Respaldo completo (JSON)</button><button class="btn sec" onclick="backupExcel()">${ICONS.download}Respaldo en Excel (una hoja por tabla)</button></div><p class="small muted mt8" id="bkInfo">${backupSummary()}</p></div>
       <div class="card acc-o"><h3>Fecha de referencia (opcional)</h3><p class="small muted">Define qué semana se considera "actual". Déjala vacía para usar la fecha real del equipo (hoy: ${fmtDate(todayISO())}). Útil para probar el flujo de semanas.</p>${formField('Fecha de referencia', `<input id="p_sim" type="date" value="${s.simDate || ''}">`)}<button class="btn ghost sm" onclick="document.getElementById('p_sim').value=''">Usar fecha real</button></div>
@@ -2102,7 +2161,7 @@ VIEWS['ADMIN:parametros'] = (u, q) => {
     <div class="conclusion mt24">Configuración → Trimestre → Semana → Ejecutivo → Captura KPI → Desglose por cadena → Validación → Envío → Cálculo acumulado → Semáforo → Dashboard BI</div>`;
 };
 /* ---------- RESPALDO COMPLETO (todas las tablas, tal cual están en la base) ---------- */
-const BACKUP_TABLES = ['roles', 'areas', 'positions', 'users', 'quarters', 'reporting_weeks', 'kpis', 'user_kpi_targets', 'chains', 'user_chain_assignments', 'chain_requests', 'weekly_submissions', 'weekly_kpi_values', 'kpi_chain_breakdowns', 'kpi_local_items', 'annual_kpi_entries', 'comments'];
+const BACKUP_TABLES = ['roles', 'areas', 'positions', 'users', 'quarters', 'reporting_weeks', 'kpis', 'user_kpi_targets', 'chains', 'user_chain_assignments', 'chain_requests', 'weekly_submissions', 'weekly_kpi_values', 'kpi_chain_breakdowns', 'kpi_local_items', 'kpi_cost_items', 'annual_kpi_entries', 'comments'];
 const snakeRow = (t, r) => (typeof rowToDb === 'function' ? rowToDb(t, r) : r);
 function backupSummary() { const n = (t) => (DB[t] || []).length; return `Ahora mismo: ${n('users')} usuarios · ${n('weekly_submissions')} capturas semanales · ${n('weekly_kpi_values')} valores · ${n('kpi_chain_breakdowns')} desgloses · ${n('kpi_local_items')} locales · ${n('annual_kpi_entries')} registros anuales · ${n('user_chain_assignments')} asignaciones · ${n('audit_logs')} líneas de auditoría.`; }
 function backupObject() {
@@ -2131,7 +2190,7 @@ function backupExcel() {
 }
 function saveSettings() {
   const g = Number($v('p_green')), y = Number($v('p_yellow')); if (!(y < g)) { toast('El umbral amarillo debe ser menor que el verde', 'err'); return; }
-  const n = { defaultGreen: g, defaultYellow: y, weekMode: $v('p_mode'), partialWeeks: $v('p_partial'), appName: $v('p_app').trim(), company: $v('p_company').trim(), reminderText: $v('p_rem').trim(), simDate: $v('p_sim') || null, dashboardTiles: [$v('p_tile0'), $v('p_tile1'), $v('p_tile2')], rentasMesFijas: Number($v('p_rfij')) || 0, rentasMesVariables: Number($v('p_rvar')) || 0, kpiCorporativoEditor: $v('p_corp').trim().toLowerCase() };
+  const n = { defaultGreen: g, defaultYellow: y, weekMode: $v('p_mode'), partialWeeks: $v('p_partial'), appName: $v('p_app').trim(), company: $v('p_company').trim(), reminderText: $v('p_rem').trim(), simDate: $v('p_sim') || null, dashboardTiles: [$v('p_tile0'), $v('p_tile1'), $v('p_tile2')], rentasMesFijas: Number($v('p_rfij')) || 0, rentasMesVariables: Number($v('p_rvar')) || 0, kpiCorporativoEditor: $v('p_corp').trim().toLowerCase(), costZonas: [0, 1, 2, 3].map(i => ({ zona: ($v('p_cz' + i) || '').trim(), tarifa: Number(String($v('p_ct' + i) || '').replace(/[^\d.]/g, '')) || 0 })).filter(z => z.zona && z.tarifa > 0), costTolerancia: Number(String($v('p_ctol') || '').replace(/[^\d.]/g, '')) || 0 };
   for (const k in n) if (JSON.stringify(DB.settings[k]) !== JSON.stringify(n[k])) { audit('settings', 'global', 'editar', k, DB.settings[k], n[k]); DB.settings[k] = n[k]; }
   saveDB(); render(); toast('Parámetros guardados', 'ok');
 }
@@ -2201,7 +2260,8 @@ function kpiCsvRows(kpiId, qid, onlyUserId = null) {
       const expected = kpi.type === 'A' && r.meta > 0 ? (r.meta * w.number / all.length) / r.meta * 100 : (r.meta ? 100 : null);
       let detalle = '';
       if (v) {
-        if (isLocalesKpi(kpi)) detalle = localItemsOf(v.id).map(it => `${it.kind} ${it.referenceDate}${it.installDate ? '→' + it.installDate : ''} ${it.installDays}d`).join(' | ');
+        if (isCostosKpi(kpi)) detalle = costItemsOf(v.id).map(it => `${it.zone} ${it.areaM2}m² $${it.realCost}${costEval(it).ok ? ' ✓' : ' ✗'}`).join(' | ');
+        else if (isLocalesKpi(kpi)) detalle = localItemsOf(v.id).map(it => `${it.kind} ${it.referenceDate}${it.installDate ? '→' + it.installDate : ''} ${it.installDays}d`).join(' | ');
         else if (isListaKpi(kpi) || isConjuntoKpi(kpi)) detalle = v.detail ? listaLines(v.detail).join(' | ') : '';
         else detalle = breakdownsOf(v.id).map(b => `${nameOf('chains', b.chainId)}: ${fmtNum(b.quantity)}`).join(' | ');
       }
@@ -2338,12 +2398,12 @@ function sbInit() {
 /* ---------- mapeo de nombres ---------- */
 const toSnake = (s) => s.replace(/[A-Z]/g, m => '_' + m.toLowerCase());
 const toCamel = (s) => s.replace(/_([a-z])/g, (m, c) => c.toUpperCase());
-const NUMERIC_COLS = new Set(['value', 'numerator', 'denominator', 'quantity', 'seq', 'install_days', 'target', 'weight', 'green_threshold', 'yellow_threshold', 'number', 'year']);
-const TABLES = ['roles', 'areas', 'positions', 'users', 'quarters', 'reporting_weeks', 'kpis', 'user_kpi_targets', 'chains', 'user_chain_assignments', 'chain_requests', 'weekly_submissions', 'weekly_kpi_values', 'kpi_chain_breakdowns', 'kpi_local_items', 'annual_kpi_entries', 'comments'];
-const CLIENT_ONLY = { users: ['password'] };
+const NUMERIC_COLS = new Set(['value', 'numerator', 'denominator', 'quantity', 'seq', 'install_days', 'rate_m2', 'area_m2', 'real_cost', 'tolerance_pct', 'target_cost', 'target', 'weight', 'green_threshold', 'yellow_threshold', 'number', 'year']);
+const TABLES = ['roles', 'areas', 'positions', 'users', 'quarters', 'reporting_weeks', 'kpis', 'user_kpi_targets', 'chains', 'user_chain_assignments', 'chain_requests', 'weekly_submissions', 'weekly_kpi_values', 'kpi_chain_breakdowns', 'kpi_local_items', 'kpi_cost_items', 'annual_kpi_entries', 'comments'];
+const CLIENT_ONLY = { users: ['password'], kpi_cost_items: ['targetCost', 'withinTarget'] };
 function rowToClient(t, r) { const o = {}; for (const k in r) { let v = r[k]; if (NUMERIC_COLS.has(k) && v != null && v !== '') v = Number(v); o[toCamel(k)] = v; } return o; }
 function rowToDb(t, r) { const o = {}; for (const k in r) { if ((CLIENT_ONLY[t] || []).includes(k)) continue; o[toSnake(k)] = r[k] === '' ? null : r[k]; } return o; }
-const SETTINGS_KEYS = ['defaultGreen', 'defaultYellow', 'appName', 'company', 'reminderText', 'dashboardTiles', 'weekMode', 'partialWeeks', 'simDate', 'rentasMesFijas', 'rentasMesVariables', 'kpiCorporativoEditor'];
+const SETTINGS_KEYS = ['defaultGreen', 'defaultYellow', 'appName', 'company', 'reminderText', 'dashboardTiles', 'weekMode', 'partialWeeks', 'simDate', 'rentasMesFijas', 'rentasMesVariables', 'kpiCorporativoEditor', 'costZonas', 'costTolerancia'];
 
 /* ---------- carga ---------- */
 async function sbLoadAll() {
@@ -2362,14 +2422,14 @@ async function sbLoadAll() {
     return { data: rows, error: null };
   }
   const results = await Promise.all(TABLES.map(t => selectAll(t)));
-  const OPTIONAL = ['kpi_local_items']; // tablas de versiones nuevas: si aún no existen en la base, se tratan como vacías
+  const OPTIONAL = ['kpi_local_items', 'kpi_cost_items']; // tablas de versiones nuevas: si aún no existen en la base, se tratan como vacías
   results.forEach((res, i) => {
     if (res.error) { if (OPTIONAL.includes(TABLES[i]) && /schema cache|does not exist/i.test(res.error.message)) { console.warn('Tabla pendiente de crear en Supabase:', TABLES[i]); db[TABLES[i]] = []; return; } throw new Error(`${TABLES[i]}: ${res.error.message}`); }
     db[TABLES[i]] = res.data.map(r => rowToClient(TABLES[i], r));
   });
   const st = await SB.from('settings').select('*'); if (st.error) throw new Error('settings: ' + st.error.message);
   for (const row of st.data) { const k = toCamel(row.key); db.settings[k] = row.value && typeof row.value === 'object' && 'value' in row.value ? row.value.value : row.value; }
-  db.settings = { defaultGreen: 100, defaultYellow: 70, appName: 'Control Semanal de KPIs', company: 'ALVACO · Comercialización', reminderText: 'Tu actualización semanal de KPIs está pendiente.', weekMode: 'lun-vie', partialWeeks: 'excluir', simDate: null, dashboardTiles: [], rentasMesFijas: 0, rentasMesVariables: 0, kpiCorporativoEditor: '', ...db.settings };
+  db.settings = { defaultGreen: 100, defaultYellow: 70, appName: 'Control Semanal de KPIs', company: 'ALVACO · Comercialización', reminderText: 'Tu actualización semanal de KPIs está pendiente.', weekMode: 'lun-vie', partialWeeks: 'excluir', simDate: null, dashboardTiles: [], rentasMesFijas: 0, rentasMesVariables: 0, kpiCorporativoEditor: '', costZonas: [{ zona: 'Norte', tarifa: 6930 }, { zona: 'Centro', tarifa: 6300 }, { zona: 'Sur', tarifa: 6615 }], costTolerancia: 5, ...db.settings };
   db.settings.defaultGreen = Number(db.settings.defaultGreen); db.settings.defaultYellow = Number(db.settings.defaultYellow);
   // tarjetas del dashboard: pueden venir como código de KPI (seed) o como id
   db.settings.dashboardTiles = (db.settings.dashboardTiles || []).map(x => (db.kpis.find(k => k.id === x) || db.kpis.find(k => k.code === x) || {}).id).filter(Boolean);
@@ -2413,6 +2473,7 @@ async function sbPushDiff() {
   await ins('kpi_chain_breakdowns', d.kpi_chain_breakdowns.ins); await upd('kpi_chain_breakdowns', d.kpi_chain_breakdowns.upd);
   await del('kpi_local_items', d.kpi_local_items.del);
   await ins('kpi_local_items', d.kpi_local_items.ins); await upd('kpi_local_items', d.kpi_local_items.upd);
+  if (d.kpi_cost_items) { await del('kpi_cost_items', d.kpi_cost_items.del); await ins('kpi_cost_items', d.kpi_cost_items.ins); await upd('kpi_cost_items', d.kpi_cost_items.upd); }
   for (const r of d.weekly_submissions.ins) { if (r.status !== 'borrador') await sbRun(SB.from('weekly_submissions').update(rowToDb('weekly_submissions', { status: r.status, comment: r.comment })).eq('id', r.id), 'weekly_submissions'); }
   await upd('weekly_submissions', d.weekly_submissions.upd);
   await ins('annual_kpi_entries', d.annual_kpi_entries.ins);
