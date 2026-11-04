@@ -447,7 +447,7 @@ const isAdmin = (u) => roleOf(u).code === 'ADMIN';
 const isDir = (u) => roleOf(u).code === 'DIRECTIVO';
 // Se considera "ejecutivo" (aparece en dashboards, metas, semanas y captura) a quien tiene rol EJECUTIVO
 // o a cualquier persona con KPIs/cadenas asignadas aunque su rol sea Administrador o Directivo.
-const hasOwnKpis = (u) => DB.user_kpi_targets.some(t => t.userId === u.id) || DB.user_chain_assignments.some(a => a.userId === u.id && !a.endDate);
+const hasOwnKpis = (u) => DB.user_kpi_targets.some(t => t.userId === u.id && t.active !== false) || DB.user_chain_assignments.some(a => a.userId === u.id && !a.endDate);
 const isExec = (u) => roleOf(u).code === 'EJECUTIVO' || hasOwnKpis(u);
 function nameOf(col, id, fb = '—') { const x = byId(col, id); return x ? x.name : fb; }
 const execs = () => where('users', u => isExec(u) && u.active).sort((a, b) => a.name.localeCompare(b.name));
